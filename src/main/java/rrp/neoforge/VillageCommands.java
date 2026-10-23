@@ -231,6 +231,8 @@ final class VillageCommands {
         }
         Commands.reply(src, lang.get("status.stock", site.hasWarehouse() ? stock.toString().trim() : lang.get("status.no_warehouse")));
         if (site.hasHall()) {
+            Commands.reply(src, lang.msg("status.orders", site.orders().isEmpty() ? "aucun" : site.orders().stream()
+                    .map(b -> b.type() + "@" + b.x() + "," + b.z()).collect(java.util.stream.Collectors.joining(" "))));
             Commands.reply(src, lang.msg("status.chests", RrpMod.warehouse().communityChests(site, Worlds.level(RrpMod.server(), site.worldName()))));
         }
     }

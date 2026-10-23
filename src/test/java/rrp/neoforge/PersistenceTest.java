@@ -36,6 +36,8 @@ class PersistenceTest {
         s.state().setRelations(30);
         s.setWarehouse(3, 64, -7);
         s.setHall(1, 65, -2);
+        s.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.TOWER, 9, 64, -8));
+        s.built().put(rrp.neoforge.urban.BuildType.FARM, 2);
         VillageSite camp = reg.create("minecraft:overworld", 100, 70, 100, 16, Faction.DISSIDENT);
         camp.state().setParentId(s.id());
         assertTrue(persistence(reg).flush());
@@ -53,6 +55,10 @@ class PersistenceTest {
         assertEquals(3, r.warehouse()[0]);
         assertEquals(-7, r.warehouse()[2]);
         assertEquals(65, r.hall()[1]);
+        assertEquals(1, r.orders().size());
+        assertEquals(rrp.neoforge.urban.BuildType.TOWER, r.orders().get(0).type());
+        assertEquals(40, r.orders().get(0).stone());
+        assertEquals(2, r.built().get(rrp.neoforge.urban.BuildType.FARM));
         assertTrue(r.inCore("minecraft:overworld", 2, -1, 12));
         assertFalse(r.inCore("minecraft:overworld", 40, -1, 12));
         assertFalse(back.get(camp.id()).hasHall());

@@ -111,6 +111,14 @@ town_hall_radius: 12
 store_radius: 5
 # Nombre maximal de coffres que les collecteurs ajoutent d'eux-mêmes quand le stock est plein. [1 ; 30]
 max_chests: 6
+# Stock de bois que le village doit avoir avant que l'intendant commande un bâtiment. [0 ; 100000]
+expansion_wood_quota: 60
+# Stock de pierre que le village doit avoir avant que l'intendant commande un bâtiment. [0 ; 100000]
+expansion_stone_quota: 40
+# Population minimale du village avant toute commande de bâtiment. [0 ; 1000]
+expansion_population_quota: 6
+# Nombre maximal d'ordres de construction en attente par village. [1 ; 50]
+max_build_orders: 3
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

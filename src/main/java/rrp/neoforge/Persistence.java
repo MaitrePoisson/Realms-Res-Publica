@@ -10,6 +10,8 @@ import rrp.core.CrisisLevel;
 import rrp.core.Faction;
 import rrp.core.Resource;
 import rrp.core.VillageState;
+import rrp.neoforge.urban.BuildOrder;
+import rrp.neoforge.urban.BuildType;
 
 import java.nio.file.Path;
 import java.io.IOException;
@@ -148,6 +150,25 @@ public final class Persistence {
             a.add(h[2]);
             o.add("hall", a);
         }
+        if (!s.orders().isEmpty()) {
+            JsonArray oa = new JsonArray();
+            for (BuildOrder b : s.orders()) {
+                JsonObject bo = new JsonObject();
+                bo.addProperty("type", b.type().name());
+                bo.addProperty("x", b.x());
+                bo.addProperty("y", b.y());
+                bo.addProperty("z", b.z());
+                bo.addProperty("wood", b.wood());
+                bo.addProperty("stone", b.stone());
+                oa.add(bo);
+            }
+            o.add("orders", oa);
+        }
+        if (!s.built().isEmpty()) {
+            JsonObject bt = new JsonObject();
+            s.built().forEach((t, n) -> bt.addProperty(t.name(), n));
+            o.add("built", bt);
+        }
         if (s.hasWarehouse()) {
             int[] w = s.warehouse();
             JsonArray a = new JsonArray();
@@ -204,6 +225,18 @@ public final class Persistence {
         if (o.has("hall")) {
             JsonArray a = o.getAsJsonArray("hall");
             s.setHall(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
+        }
+        if (o.has("orders")) {
+            for (JsonElement e : o.getAsJsonArray("orders")) {
+                JsonObject bo = e.getAsJsonObject();
+                s.orders().add(new BuildOrder(BuildType.valueOf(bo.get("type").getAsString()), bo.get("x").getAsInt(),
+                        bo.get("y").getAsInt(), bo.get("z").getAsInt(), bo.get("wood").getAsInt(), bo.get("stone").getAsInt()));
+            }
+        }
+        if (o.has("built")) {
+            for (var e : o.getAsJsonObject("built").entrySet()) {
+                s.built().put(BuildType.valueOf(e.getKey()), e.getValue().getAsInt());
+            }
         }
         if (o.has("warehouse")) {
             JsonArray a = o.getAsJsonArray("warehouse");

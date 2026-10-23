@@ -1,6 +1,13 @@
 package rrp.neoforge;
 
 import rrp.core.VillageState;
+import rrp.neoforge.urban.BuildOrder;
+import rrp.neoforge.urban.BuildType;
+
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.List;
+import java.util.Map;
 
 /** Un village (ou campement) placé dans le monde : état du cœur + dimension, centre, rayon et entrepôt. */
 public final class VillageSite {
@@ -17,6 +24,10 @@ public final class VillageSite {
     private int[] warehouse;
     /** Coordonnées du bloc d'or de l'Hôtel de Ville, ou {@code null} tant qu'il n'existe pas. */
     private int[] hall;
+    /** Ordres de construction en attente (émis par l'intendant), dans l'ordre. */
+    private final List<BuildOrder> orders = new ArrayList<>();
+    /** Nombre de bâtiments construits par type (hors huttes historiques). */
+    private final Map<BuildType, Integer> built = new EnumMap<>(BuildType.class);
 
     public VillageSite(VillageState state, String worldName, double x, double y, double z, int radius) {
         this.state = state;
@@ -52,6 +63,9 @@ public final class VillageSite {
     public void setHall(int bx, int by, int bz) {
         this.hall = new int[] {bx, by, bz};
     }
+
+    public List<BuildOrder> orders() { return orders; }
+    public Map<BuildType, Integer> built() { return built; }
 
     public void clearHall() {
         this.hall = null;

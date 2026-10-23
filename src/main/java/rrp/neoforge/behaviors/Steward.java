@@ -6,6 +6,7 @@ import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.core.VillagerState;
 import rrp.neoforge.WarehouseService;
+import rrp.neoforge.urban.ExpansionPlanner;
 
 import java.util.Comparator;
 import java.util.List;
@@ -30,6 +31,32 @@ public final class Steward extends RoleBehavior {
 
     @Override
     public boolean runOnce(BehaviorContext ctx) {
+        boolean planned = planExpansion(ctx);
+        return feed(ctx) | planned;
+    }
+
+    /** Émet un ordre de construction si les quotas de stock et de population le permettent. */
+    private static boolean planExpansion(BehaviorContext ctx) {
+        var site = ctx.site();
+        if (!site.hasHall() || !site.hasWarehouse()) {
+            return false;
+        }
+        var cfg = ctx.config();
+        var quotas = new ExpansionPlanner.Quotas((int) cfg.get(SimConfig.Key.EXPANSION_WOOD_QUOTA),
+                (int) cfg.get(SimConfig.Key.EXPANSION_STONE_QUOTA), (int) cfg.get(SimConfig.Key.EXPANSION_POPULATION_QUOTA),
+                (int) cfg.get(SimConfig.Key.MAX_BUILD_ORDERS));
+        var situation = new ExpansionPlanner.Situation(site.state().population(), site.state().beds(),
+                site.state().stock(Resource.WOOD), site.state().stock(Resource.STONE), site.hall(), site.built(),
+                java.util.List.copyOf(site.orders()));
+        var order = ExpansionPlanner.plan(situation, quotas, (int) cfg.get(SimConfig.Key.BUILDER_SPARE_BEDS));
+        order.ifPresent(o -> {
+            site.orders().add(o);
+            ctx.registry().markDirty();
+        });
+        return order.isPresent();
+    }
+
+    private static boolean feed(BehaviorContext ctx) {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
