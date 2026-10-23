@@ -16,6 +16,7 @@ public final class RrpPlugin extends JavaPlugin {
     private VillagerAdapter adapter;
     private GaugeTicker gauges;
     private BehaviorScheduler behaviors;
+    private BirthService births;
     private Persistence persistence;
     private Lang lang;
     private Selftest selftest;
@@ -31,12 +32,14 @@ public final class RrpPlugin extends JavaPlugin {
         adapter = new VillagerAdapter(() -> simConfig, registry);
         gauges = new GaugeTicker(() -> simConfig, registry, warehouse, adapter);
         behaviors = new BehaviorScheduler(() -> simConfig, registry, warehouse, adapter);
+        births = new BirthService(() -> simConfig, registry, warehouse, adapter);
         getServer().getPluginManager().registerEvents(adapter, this);
         int loaded = persistence.load();
         selftest = new Selftest(this, ticks, lang);
         VillageCases.all().forEach(selftest::register);
         RoleCases.all().forEach(selftest::register);
         BehaviorCases.all().forEach(selftest::register);
+        BirthCases.all().forEach(selftest::register);
         Commands commands = new Commands(this);
         PluginCommand cmd = getCommand("respublica");
         if (cmd != null) {
@@ -47,6 +50,7 @@ public final class RrpPlugin extends JavaPlugin {
             scanner.onTicks(t);
             gauges.onTicks(t);
             behaviors.onTicks(t);
+            births.onTicks(t);
             persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S));
         };
         ticks.register(worldTimer);
@@ -115,6 +119,10 @@ public final class RrpPlugin extends JavaPlugin {
 
     public BehaviorScheduler behaviors() {
         return behaviors;
+    }
+
+    public BirthService births() {
+        return births;
     }
 
     public Persistence persistence() {
