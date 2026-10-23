@@ -18,7 +18,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Aucune clé de texte utilisée par le code ne doit manquer dans lang_fr.yml, et l'aide couvre toute sous-commande. */
 class LangKeysTest {
 
-    private static final Path SRC = Path.of("src/main/java/rrp/bukkit");
+    // Transitoire (portage NeoForge) : tant que Commands.java n'est pas porte, on lit la reference Paper.
+    private static final Path SRC = Files.exists(Path.of("src/main/java/rrp/neoforge/Commands.java"))
+            ? Path.of("src/main/java/rrp/neoforge") : Path.of("legacy-paper/java/rrp/bukkit");
     private static final Pattern KEY = Pattern.compile("\"((?:[a-z_]+\\.)+[a-z_]+)\"");
     private static final Pattern LANG_CALL = Pattern.compile("\\blang\\s*\\.\\s*(?:get|msg)\\s*\\(");
     private static final Pattern YAML_KEY = Pattern.compile("^\"?([A-Za-z0-9_.]+)\"?\\s*:", Pattern.MULTILINE);

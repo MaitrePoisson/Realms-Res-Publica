@@ -9,3 +9,4 @@
 # Build
 build/
 .gradle/
+run/

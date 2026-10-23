@@ -1,35 +1,57 @@
 plugins {
     java
+    id("net.neoforged.moddev") version "2.0.78"
 }
 
 group = "rrp"
-version = "0.1.0"
+version = property("mod_version") as String
 
 repositories {
     mavenCentral()
-    maven("https://repo.papermc.io/repository/maven-public/")
+}
+
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(21))
+}
+
+neoForge {
+    version = property("neo_version") as String
+
+    runs {
+        create("server") {
+            server()
+            programArguments.add("--nogui")
+            systemProperty("neoforge.enabledGameTestNamespaces", "respublica")
+        }
+        create("gameTestServer") {
+            type = "gameTestServer"
+            systemProperty("neoforge.enabledGameTestNamespaces", "respublica")
+        }
+    }
+
+    mods {
+        create("respublica") {
+            sourceSet(sourceSets.main.get())
+        }
+    }
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.20.4-R0.1-SNAPSHOT")
     testImplementation(platform("org.junit:junit-bom:5.10.2"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(17))
-}
-
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    options.release.set(17)
+    options.release.set(21)
 }
 
 tasks.processResources {
-    inputs.property("version", project.version)
-    filesMatching("plugin.yml") {
-        expand("version" to project.version)
+    val props = mapOf("mod_version" to project.version.toString(), "mod_id" to project.property("mod_id").toString())
+    inputs.properties(props)
+    filesMatching("META-INF/neoforge.mods.toml") {
+        expand(props)
     }
 }
 
