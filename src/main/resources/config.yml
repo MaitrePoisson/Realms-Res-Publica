@@ -101,3 +101,5 @@ hut_wood: 30
 talk_loyalty_bonus: 2
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
+# Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]
+show_action_bar: 1

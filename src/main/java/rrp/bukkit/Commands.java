@@ -140,7 +140,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
             return;
         }
         var st = site.state();
-        sender.sendMessage(lang.msg("status.header", site.id(), st.faction(), st.level()));
+        sender.sendMessage(lang.msg("status.header", site.id(), st.faction(), st.level().label()));
         sender.sendMessage(lang.get("status.people", st.population(), st.beds(), site.radius()));
         StringBuilder stock = new StringBuilder();
         for (Resource r : Resource.values()) {

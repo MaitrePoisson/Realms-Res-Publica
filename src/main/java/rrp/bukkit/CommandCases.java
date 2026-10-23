@@ -113,6 +113,13 @@ final class CommandCases {
                     "overpopulate", "insecurity", "reload")) {
                 check(lines.stream().anyMatch(l -> l.contains("/respublica " + sub)), "aide sans " + sub + " : " + lines);
             }
+            check(lines.stream().anyMatch(l -> l.contains("/respublica help")), "l'aide ne s'inclut pas elle-même");
+            List<Villager> vs = new ArrayList<>();
+            VillageSite s = CrisisCases.village(w, p, 13600, 4, 50, vs);
+            check(run(p, "status", s.id()).stream().anyMatch(l -> l.contains("crise Stable")),
+                    "status sans libellé de crise lisible");
+            String bar = p.actionBar().line(s);
+            check(bar.contains(s.id()) && bar.contains("Stable") && !bar.contains("?"), "barre d'action incorrecte : " + bar);
         });
     }
 

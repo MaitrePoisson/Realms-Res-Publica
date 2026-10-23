@@ -14,6 +14,7 @@ public final class RrpPlugin extends JavaPlugin {
     private final VisualExport visuals = new VisualExport();
     private SimConfig simConfig = SimConfig.defaults();
     private VillageScanner scanner;
+    private ActionBarService actionBar;
     private VillagerAdapter adapter;
     private GaugeTicker gauges;
     private BehaviorScheduler behaviors;
@@ -37,6 +38,7 @@ public final class RrpPlugin extends JavaPlugin {
         behaviors = new BehaviorScheduler(() -> simConfig, registry, warehouse, adapter);
         births = new BirthService(() -> simConfig, registry, warehouse, adapter);
         crises = new CrisisService(() -> simConfig, registry, warehouse, adapter, lang, getLogger());
+        actionBar = new ActionBarService(() -> simConfig, registry, lang);
         war = new WarService(() -> simConfig, registry, adapter, crises, lang, getLogger());
         getServer().getPluginManager().registerEvents(adapter, this);
         int loaded = persistence.load();
@@ -61,6 +63,7 @@ public final class RrpPlugin extends JavaPlugin {
             gauges.onTicks(t);
             crises.onTicks(t);
             war.onTicks(t);
+            actionBar.onTicks(t);
             behaviors.onTicks(t);
             births.onTicks(t);
             persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S));
@@ -119,6 +122,10 @@ public final class RrpPlugin extends JavaPlugin {
 
     public WarehouseService warehouse() {
         return warehouse;
+    }
+
+    public ActionBarService actionBar() {
+        return actionBar;
     }
 
     public VillageScanner scanner() {

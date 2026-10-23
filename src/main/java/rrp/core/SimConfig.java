@@ -63,7 +63,8 @@ public final class SimConfig {
         RELATIONS_PER_VISIT(5, 0, 100),
         HUT_WOOD(30, 4, 500),
         TALK_LOYALTY_BONUS(2, 0, 50),
-        SHOW_ROLE_NAMES(1, 0, 1);
+        SHOW_ROLE_NAMES(1, 0, 1),
+        SHOW_ACTION_BAR(1, 0, 1);
 
         private final double def;
         private final double min;
