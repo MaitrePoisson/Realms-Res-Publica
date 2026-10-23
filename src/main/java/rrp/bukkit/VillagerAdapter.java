@@ -48,6 +48,8 @@ public final class VillagerAdapter implements Listener {
     private final Supplier<SimConfig> config;
     private final VillageRegistry registry;
 
+    private long pdcWrites;
+
     public VillagerAdapter(Supplier<SimConfig> config, VillageRegistry registry) {
         this.config = config;
         this.registry = registry;
@@ -72,7 +74,13 @@ public final class VillagerAdapter implements Listener {
                 pdc.getOrDefault(loyaltyKey, PersistentDataType.DOUBLE, 70.0));
     }
 
+    /** Nombre d'écritures complètes dans un PDC depuis le démarrage (tests, diagnostic). */
+    public long pdcWrites() {
+        return pdcWrites;
+    }
+
     public void write(Villager v, VillagerState s) {
+        pdcWrites++;
         PersistentDataContainer pdc = v.getPersistentDataContainer();
         pdc.set(roleKey, PersistentDataType.STRING, s.role().name());
         pdc.set(moraleKey, PersistentDataType.DOUBLE, s.morale());
@@ -174,11 +182,20 @@ public final class VillagerAdapter implements Listener {
         for (VillagerState s : site.state().villagers()) {
             Entity e = Bukkit.getEntity(s.id());
             if (e instanceof Villager v) {
-                write(v, s);
+                if (!sameAsStored(v, s)) {
+                    write(v, s);
+                }
                 n++;
             }
         }
         return n;
+    }
+
+    /** Vrai si le PDC contient déjà exactement ces valeurs (évite une écriture inutile au flush groupé). */
+    private boolean sameAsStored(Villager v, VillagerState s) {
+        VillagerState old = read(v);
+        return old != null && old.role() == s.role() && old.factionId().equals(s.factionId())
+                && old.morale() == s.morale() && old.satiety() == s.satiety() && old.loyalty() == s.loyalty();
     }
 
     private VillageSite siteOf(Villager v) {
