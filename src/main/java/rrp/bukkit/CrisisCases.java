@@ -33,7 +33,7 @@ final class CrisisCases {
     }
 
     /** Comme {@link VillageCases#of}, et fait enregistrer à CampBuilder les blocs qu'il modifie pour tout restaurer. */
-    private static SelftestCase of(String name, VillageCases.Body body) {
+    static SelftestCase of(String name, VillageCases.Body body) {
         return VillageCases.of(name, (w, p) -> {
             p.crises().camps().setRecorder(w::remember);
             try {
@@ -50,7 +50,7 @@ final class CrisisCases {
     }
 
     /** Village de {@code n} adultes, un tonneau-entrepôt rempli de {@code food} pains, un seul lit réel. */
-    private static VillageSite village(TestWorld w, RrpPlugin p, int x, int n, int food, List<Villager> vs) {
+    static VillageSite village(TestWorld w, RrpPlugin p, int x, int n, int food, List<Villager> vs) {
         w.prepare(x, x, 4);
         VillageSite s = RoleCases.villageOf(w, p, x, x, n, vs);
         Location g = s.center(w.world());
@@ -75,7 +75,7 @@ final class CrisisCases {
     }
 
     /** Avance le temps de 10 s par pas jusqu'à ce que la condition soit vraie ; renvoie le nombre de pas, ou -1. */
-    private static int runUntil(RrpPlugin p, int maxSteps, BooleanSupplier done) {
+    static int runUntil(RrpPlugin p, int maxSteps, BooleanSupplier done) {
         for (int i = 0; i < maxSteps; i++) {
             if (done.getAsBoolean()) {
                 return i;
@@ -100,7 +100,7 @@ final class CrisisCases {
         return n;
     }
 
-    private static String diag(VillageSite s) {
+    static String diag(VillageSite s) {
         return "niveau=" + s.state().level() + " pop=" + s.state().population() + " stock="
                 + s.state().stock(Resource.FOOD) + " loyauté=" + Math.round(s.state().averageLoyalty())
                 + " moral=" + Math.round(s.state().averageMorale()) + " minuteurs=" + Math.round(s.state().contestTimer())

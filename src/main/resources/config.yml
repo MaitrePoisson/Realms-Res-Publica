@@ -83,6 +83,8 @@ war_tension: 60
 war_no_diplomat_penalty: 10
 # Relations (0-100) à atteindre pour qu'une trêve soit signée. [0 ; 100]
 truce_relations: 70
+# Dégâts (PV) d'une frappe de garde pendant la guerre civile, une frappe par seconde. [0.5 ; 100]
+war_damage: 4
 # Vitesse de redescente des minuteurs de crise quand l'indicateur disparaît (s perdues par s). [0.01 ; 10]
 crisis_recovery_factor: 0.25
 

@@ -19,6 +19,7 @@ public final class RrpPlugin extends JavaPlugin {
     private BehaviorScheduler behaviors;
     private BirthService births;
     private CrisisService crises;
+    private WarService war;
     private Persistence persistence;
     private Lang lang;
     private Selftest selftest;
@@ -36,6 +37,7 @@ public final class RrpPlugin extends JavaPlugin {
         behaviors = new BehaviorScheduler(() -> simConfig, registry, warehouse, adapter);
         births = new BirthService(() -> simConfig, registry, warehouse, adapter);
         crises = new CrisisService(() -> simConfig, registry, warehouse, adapter, lang, getLogger());
+        war = new WarService(() -> simConfig, registry, adapter, crises, lang, getLogger());
         getServer().getPluginManager().registerEvents(adapter, this);
         int loaded = persistence.load();
         selftest = new Selftest(this, ticks, lang);
@@ -44,6 +46,7 @@ public final class RrpPlugin extends JavaPlugin {
         BehaviorCases.all().forEach(selftest::register);
         BirthCases.all().forEach(selftest::register);
         CrisisCases.all().forEach(selftest::register);
+        WarCases.all().forEach(selftest::register);
         Commands commands = new Commands(this);
         PluginCommand cmd = getCommand("respublica");
         if (cmd != null) {
@@ -54,6 +57,7 @@ public final class RrpPlugin extends JavaPlugin {
             scanner.onTicks(t);
             gauges.onTicks(t);
             crises.onTicks(t);
+            war.onTicks(t);
             behaviors.onTicks(t);
             births.onTicks(t);
             persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S));
@@ -136,6 +140,10 @@ public final class RrpPlugin extends JavaPlugin {
 
     public CrisisService crises() {
         return crises;
+    }
+
+    public WarService war() {
+        return war;
     }
 
     public Persistence persistence() {

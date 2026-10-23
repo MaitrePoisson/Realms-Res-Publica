@@ -14,6 +14,8 @@ public final class VillageSite {
     private final double y;
     private final double z;
     private int radius;
+    /** Rayon d'appartenance élargi pendant une guerre civile (non persisté) : les combattants peuvent atteindre le camp adverse. */
+    private int warReach;
     /** Coordonnées du tonneau-entrepôt, ou {@code null} tant qu'aucun n'est désigné. */
     private int[] warehouse;
 
@@ -34,6 +36,9 @@ public final class VillageSite {
     public double z() { return z; }
     public int radius() { return radius; }
     public void setRadius(int radius) { this.radius = radius; }
+    /** Rayon d'appartenance : le rayon du village, élargi tant qu'une guerre civile l'exige. */
+    public int reach() { return Math.max(radius, warReach); }
+    public void setWarReach(int warReach) { this.warReach = Math.max(0, warReach); }
     public int[] warehouse() { return warehouse == null ? null : warehouse.clone(); }
     public boolean hasWarehouse() { return warehouse != null; }
 

@@ -99,7 +99,7 @@ public final class VillageRegistry {
         double bestD = Double.MAX_VALUE;
         for (VillageSite s : sites.values()) {
             double d = s.distance(world, x, z);
-            if (d <= s.radius() && d < bestD) {
+            if (d <= s.reach() && d < bestD) {
                 best = s;
                 bestD = d;
             }

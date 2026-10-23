@@ -101,7 +101,7 @@ public final class VillagerAdapter implements Listener {
     /** Villageois adultes et vivants dont le village le plus proche est {@code site}. */
     public List<Villager> present(VillageSite site, World world) {
         List<Villager> out = new ArrayList<>();
-        int r = site.radius();
+        int r = site.reach();
         for (Entity e : world.getNearbyEntities(site.center(world), r, 128, r, x -> x instanceof Villager)) {
             Villager v = (Villager) e;
             Location l = v.getLocation();

@@ -20,6 +20,7 @@ import rrp.core.VillagerState;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -44,6 +45,7 @@ public final class CrisisService {
     private final Lang lang;
     private final Logger log;
     private final CampBuilder camps = new CampBuilder();
+    private final List<Consumer<SimEvent>> listeners = new ArrayList<>();
     private long accumulated;
     private long exiles;
 
@@ -55,6 +57,11 @@ public final class CrisisService {
         this.adapter = adapter;
         this.lang = lang;
         this.log = log;
+    }
+
+    /** Abonne un service (guerre civile) aux événements, appelé après leur application au monde. */
+    public void addListener(Consumer<SimEvent> listener) {
+        listeners.add(listener);
     }
 
     public CampBuilder camps() {
@@ -120,6 +127,9 @@ public final class CrisisService {
         } else if (e instanceof SimEvent.Exile x) {
             applyExile(x, states);
         }
+        for (Consumer<SimEvent> l : listeners) {
+            l.accept(e);
+        }
     }
 
     private void announceChange(SimEvent.CrisisChanged c) {
@@ -141,7 +151,7 @@ public final class CrisisService {
     }
 
     /** Message aux joueurs proches du village (rayon + marge) et dans la console. */
-    private void tell(VillageSite site, String message) {
+    void tell(VillageSite site, String message) {
         log.info(message.replaceAll("§.", ""));
         World w = Bukkit.getWorld(site.worldName());
         if (w == null) {

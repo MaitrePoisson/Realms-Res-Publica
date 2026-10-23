@@ -55,6 +55,7 @@ public final class SimConfig {
         WAR_TENSION(60, 0, 200),
         WAR_NO_DIPLOMAT_PENALTY(10, 0, 100),
         TRUCE_RELATIONS(70, 0, 100),
+        WAR_DAMAGE(4, 0.5, 100),
         CRISIS_RECOVERY_FACTOR(0.25, 0.01, 10),
         // Rôles
         BEHAVIOR_INTERVAL_S(10, 1, 3600),
