@@ -5,7 +5,9 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.World;
 import org.bukkit.block.data.Ageable;
+import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Villager;
+import org.bukkit.inventory.ItemStack;
 import rrp.core.Resource;
 import rrp.core.Role;
 import rrp.core.VillagerState;
@@ -24,7 +26,9 @@ final class BehaviorCases {
 
     static List<SelftestCase> all() {
         return List.of(farmerHarvestsAndReplants(), foresterFellsAndReplants(), minerBreaksOreAndStone(),
-                lowMoraleMeansNoAction(), actionsStayInWorkRadius(), actionsFollowCadence());
+                lowMoraleMeansNoAction(), actionsStayInWorkRadius(), actionsFollowCadence(),
+                stewardFeedsHungryFromBarrel(), stewardWithoutFoodOrMorale(), guardKillsNearbyMonster(),
+                guardIgnoresFarMonsterAndDisobeys());
     }
 
     /** Un village de trois villageois dont le premier a le rôle testé, avec un tonneau-entrepôt vide. */
@@ -43,7 +47,7 @@ final class BehaviorCases {
         p.warehouse().set(s, barrel);
         p.warehouse().refresh(s, w.world());
         for (Villager v : vs) {
-            p.adapter().setRole(v, Role.GUARD);
+            p.adapter().setRole(v, Role.DIPLOMAT);
         }
         p.adapter().setRole(vs.get(0), role);
         for (VillagerState st : s.state().villagers()) {
@@ -155,6 +159,69 @@ final class BehaviorCases {
             check(stock(r, p, w.world(), Resource.FOOD) == 0, "action avant l'intervalle");
             p.ticks().advance(1);
             check(stock(r, p, w.world(), Resource.FOOD) >= 1, "pas d'action à l'intervalle");
+        });
+    }
+
+    private static VillagerState other(Rig r, RrpPlugin p) {
+        return r.site().state().villagers().stream().filter(v -> !v.id().equals(r.worker().getUniqueId())).findFirst().orElseThrow();
+    }
+
+    private static SelftestCase stewardFeedsHungryFromBarrel() {
+        return of("intendant : retire de la nourriture du tonneau, la satiété d'un affamé remonte", (w, p) -> {
+            Rig r = rig(w, p, 5600, 5600, Role.STEWARD);
+            p.warehouse().deposit(r.site(), w.world(), new ItemStack(Material.BREAD, 10));
+            VillagerState hungry = other(r, p);
+            hungry.setSatiety(20);
+            check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "l'intendant n'a rien fait");
+            check(hungry.satiety() > 20, "satiété non remontée : " + hungry.satiety());
+            int left = stock(r, p, w.world(), Resource.FOOD);
+            check(left < 10, "le tonneau n'a pas été entamé : " + left);
+            check(r.site().state().stock(Resource.FOOD) == left, "stock de l'état et tonneau réel divergent");
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()) || hungry.satiety() <= 100, "satiété hors bornes");
+        });
+    }
+
+    private static SelftestCase stewardWithoutFoodOrMorale() {
+        return of("intendant : sans nourriture ou démoralisé, personne n'est servi", (w, p) -> {
+            Rig r = rig(w, p, 5800, 5800, Role.STEWARD);
+            VillagerState hungry = other(r, p);
+            hungry.setSatiety(20);
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "action sans nourriture");
+            check(hungry.satiety() == 20, "satiété changée sans nourriture");
+            p.warehouse().deposit(r.site(), w.world(), new ItemStack(Material.BREAD, 10));
+            p.adapter().stateOf(r.worker()).setMorale(5);
+            check(!p.behaviors().work(r.site(), w.world(), r.worker()), "intendant démoralisé au travail");
+            check(hungry.satiety() == 20 && stock(r, p, w.world(), Resource.FOOD) == 10, "nourriture distribuée malgré la désobéissance");
+        });
+    }
+
+    private static SelftestCase guardKillsNearbyMonster() {
+        return of("garde : tue un monstre proche, les menaces du village baissent de 1", (w, p) -> {
+            Rig r = rig(w, p, 6000, 6000, Role.GUARD);
+            Creeper c = w.spawn(r.at(0, 9), Creeper.class);
+            c.setAI(false);
+            p.gauges().stepSite(r.site(), w.world(), 20, true);
+            check(r.site().state().threats() == 1, "menaces avant : " + r.site().state().threats());
+            check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "le garde n'a rien fait");
+            check(c.isDead() || !c.isValid(), "le monstre est toujours vivant");
+            check(r.site().state().threats() == 0, "menaces après : " + r.site().state().threats());
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "action sans monstre");
+        });
+    }
+
+    private static SelftestCase guardIgnoresFarMonsterAndDisobeys() {
+        return of("garde : ignore un monstre hors rayon de travail et ne frappe pas démoralisé", (w, p) -> {
+            Rig r = rig(w, p, 6200, 6200, Role.GUARD);
+            int radius = (int) p.simConfig().get(rrp.core.SimConfig.Key.WORK_RADIUS);
+            Creeper far = w.spawn(r.at(0, 5 + radius + 8), Creeper.class);
+            far.setAI(false);
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "action hors rayon");
+            check(far.isValid() && !far.isDead(), "monstre lointain tué");
+            Creeper near = w.spawn(r.at(0, 9), Creeper.class);
+            near.setAI(false);
+            p.adapter().stateOf(r.worker()).setMorale(5);
+            check(!p.behaviors().work(r.site(), w.world(), r.worker()), "garde démoralisé au travail");
+            check(near.isValid() && !near.isDead(), "monstre tué malgré la désobéissance");
         });
     }
 }

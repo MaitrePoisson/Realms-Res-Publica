@@ -6,8 +6,10 @@ import org.bukkit.entity.Villager;
 import rrp.bukkit.behaviors.BehaviorContext;
 import rrp.bukkit.behaviors.Farmer;
 import rrp.bukkit.behaviors.Forester;
+import rrp.bukkit.behaviors.Guard;
 import rrp.bukkit.behaviors.Miner;
 import rrp.bukkit.behaviors.RoleBehavior;
+import rrp.bukkit.behaviors.Steward;
 import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.core.VillagerState;
@@ -43,6 +45,8 @@ public final class BehaviorScheduler {
         register(new Farmer());
         register(new Forester());
         register(new Miner());
+        register(new Steward());
+        register(new Guard());
     }
 
     public void register(RoleBehavior behavior) {
