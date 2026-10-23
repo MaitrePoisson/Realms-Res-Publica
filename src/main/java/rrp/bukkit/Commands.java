@@ -140,8 +140,13 @@ public final class Commands implements CommandExecutor, TabCompleter {
             return;
         }
         var st = site.state();
-        sender.sendMessage(lang.msg("status.header", site.id(), st.faction(), st.level().label()));
+        sender.sendMessage(lang.msg("status.header", site.id(), st.faction().label(), st.level().label()));
         sender.sendMessage(lang.get("status.people", st.population(), st.beds(), site.radius()));
+        double satiety = st.villagers().stream().mapToDouble(rrp.core.VillagerState::satiety).average().orElse(0);
+        sender.sendMessage(lang.get("status.gauges", Math.round(st.averageMorale()), Math.round(satiety),
+                Math.round(st.averageLoyalty()), st.threats(), Math.round(st.relations())));
+        sender.sendMessage(lang.get("status.timers", Math.round(st.contestTimer()), Math.round(st.exileTimer()),
+                Math.round(st.warTimer())));
         StringBuilder stock = new StringBuilder();
         for (Resource r : Resource.values()) {
             stock.append(r.label()).append(' ').append(st.stock(r)).append("  ");

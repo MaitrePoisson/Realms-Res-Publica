@@ -88,8 +88,9 @@ public final class GaugeTicker {
         if (state.villagers().isEmpty()) {
             return;
         }
-        warehouse.refresh(site, world);
-        state.setFoodManaged(site.hasWarehouse());
+        // Tonneau non chargé : stock périmé, on ne fait ni manger ni mourir de faim sur une valeur fantôme.
+        boolean fresh = warehouse.refresh(site, world);
+        state.setFoodManaged(site.hasWarehouse() && fresh);
         if (refreshThreats) {
             state.setThreats(countThreats(site, world));
         }

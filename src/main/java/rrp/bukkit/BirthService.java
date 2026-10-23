@@ -71,7 +71,9 @@ public final class BirthService {
         }
         SimConfig cfg = config.get();
         double interval = cfg.get(SimConfig.Key.BIRTH_INTERVAL_S);
-        warehouse.refresh(site, world);
+        if (site.hasWarehouse() && !warehouse.refresh(site, world)) {
+            return 0; // tonneau non chargé : pas de naissance sur un stock périmé
+        }
         int babies = countBabies(site, world);
         double remaining = ticks / 20.0;
         int made = 0;

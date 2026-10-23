@@ -156,17 +156,18 @@ final class CrisisCases {
             SimEvent.Exile exile = events.stream().filter(e -> e instanceof SimEvent.Exile).map(e -> (SimEvent.Exile) e)
                     .findFirst().orElse(null);
             check(exile != null, "aucun exil émis : " + diag(s));
-            check(exile.villagerIds().size() == 5, "5 exilés attendus (tous sauf un), vus " + exile.villagerIds().size());
-            check(s.state().level() == CrisisLevel.EXIL && s.state().population() == 1, "village après exil : " + diag(s));
+            int n = exile.villagerIds().size();
+            check(n >= 2 && n <= 3, "2 à 3 exilés attendus (plafond exile_max_share = 50 % de 6), vus " + n);
+            check(s.state().level() == CrisisLevel.EXIL && s.state().population() == 6 - n, "village après exil : " + diag(s));
 
             VillageSite camp = campOf(p, s);
             check(camp != null, "campement non enregistré");
             World world = w.world();
-            check(camp.state().faction() == Faction.DISSIDENT && camp.state().population() == 5, "camp : " + diag(camp));
-            check(camp.state().count(Role.GUARD) >= 2, "au moins 2 gardes (part 40 %) attendus, vus " + camp.state().count(Role.GUARD));
+            check(camp.state().faction() == Faction.DISSIDENT && camp.state().population() == n, "camp : " + diag(camp));
+            check(camp.state().count(Role.GUARD) >= 1, "au moins 1 garde attendu, vus " + camp.state().count(Role.GUARD));
             check(camp.distance(s.worldName(), s.x(), s.z()) >= s.radius(), "campement dans le rayon du village");
             check(countAround(world, camp, m -> m == Material.CAMPFIRE) == 1, "un feu de camp attendu");
-            check(countAround(world, camp, Tag.WOOL::isTagged) >= 5 * 6, "tentes de laine manquantes");
+            check(countAround(world, camp, Tag.WOOL::isTagged) >= n * 6, "tentes de laine manquantes");
             check(camp.warehouseBlock(world) != null, "tonneau du camp absent");
             int share = (int) Math.floor(30 * p.simConfig().get(SimConfig.Key.EXILE_FOOD_SHARE));
             check(p.warehouse().read(camp, world).getOrDefault(Resource.FOOD, 0) == share,
@@ -174,7 +175,7 @@ final class CrisisCases {
             check(p.warehouse().read(s, world).getOrDefault(Resource.FOOD, 0) == 30 - share,
                     "tonneau du village : " + p.warehouse().read(s, world));
             p.scanner().refreshNow(camp);
-            check(camp.state().beds() == 5, "5 lits réels attendus au camp, comptés " + camp.state().beds());
+            check(camp.state().beds() == n, n + " lits réels attendus au camp, comptés " + camp.state().beds());
 
             for (VillagerState st : camp.state().villagers()) {
                 Entity e = org.bukkit.Bukkit.getEntity(st.id());
@@ -186,8 +187,8 @@ final class CrisisCases {
                 VillagerState stored = p.adapter().read(v);
                 check(stored != null && camp.id().equals(stored.factionId()), "faction du PDC non mise à jour");
             }
-            check(p.adapter().sync(s, world) == 0 && s.state().population() == 1, "le village a réadopté un exilé");
-            check(p.adapter().sync(camp, world) == 0 && camp.state().population() == 5, "le camp a perdu un exilé");
+            check(p.adapter().sync(s, world) == 0 && s.state().population() == 6 - n, "le village a réadopté un exilé");
+            check(p.adapter().sync(camp, world) == 0 && camp.state().population() == n, "le camp a perdu un exilé");
 
             check(p.persistence().flush(), "écriture de villages.json impossible");
             String json = Files.readString(new File(p.getDataFolder(), Persistence.FILE).toPath());
@@ -205,16 +206,17 @@ final class CrisisCases {
             primeForExile(p, s);
             p.crises().advance(100);
             VillageSite camp = campOf(p, s);
-            check(camp != null && camp.state().population() == 6, "premier exil : " + (camp == null ? "aucun camp" : diag(camp)));
+            int first = camp == null ? 0 : camp.state().population();
+            check(first >= 2 && first <= 4, "premier exil (2 à 4 sur 8) : " + (camp == null ? "aucun camp" : diag(camp)));
             for (VillagerState st : s.state().villagers()) {
                 st.setLoyalty(10);
             }
             primeForExile(p, s);
             p.crises().advance(100);
             check(campOf(p, s) == camp, "un second campement a été créé");
-            check(camp.state().population() == 7 && s.state().population() == 1, "second exil : " + diag(camp) + " / " + diag(s));
+            check(camp.state().population() > first && camp.state().population() + s.state().population() == 8, "second exil : " + diag(camp) + " / " + diag(s));
             p.scanner().refreshNow(camp);
-            check(camp.state().beds() == 7, "7 lits attendus, comptés " + camp.state().beds());
+            check(camp.state().beds() == camp.state().population(), camp.state().population() + " lits attendus, comptés " + camp.state().beds());
             check(countAround(w.world(), camp, m -> m == Material.CAMPFIRE) == 1, "un seul feu de camp attendu");
         });
     }

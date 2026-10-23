@@ -29,7 +29,8 @@ public final class Builder extends RoleBehavior {
 
     @Override
     public boolean runOnce(BehaviorContext ctx) {
-        if (!ctx.site().hasWarehouse() || ctx.site().state().beds() >= ctx.site().state().population()) {
+        if (!ctx.site().hasWarehouse() || ctx.site().state().beds()
+                >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
             return false;
         }
         int cost = (int) ctx.config().get(SimConfig.Key.HUT_WOOD);

@@ -37,6 +37,8 @@ public final class DemographyEngine {
         int cost = (int) cfg.get(Key.BIRTH_FOOD_COST);
         int needed = Math.max((int) cfg.get(Key.BIRTH_FOOD_THRESHOLD), cost);
         return village.stock(Resource.FOOD) >= needed
+                && village.level() == CrisisLevel.STABLE
+                && !CrisisEngine.indicators(village, cfg).famine()
                 && freeBeds(village) > 0
                 && village.population() < (int) cfg.get(Key.MAX_POPULATION);
     }

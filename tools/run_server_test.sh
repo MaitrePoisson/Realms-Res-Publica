@@ -30,7 +30,7 @@ cd "$SRV" || exit 1
   sleep 2
   echo stop
   sleep 25
-) | timeout $((LIMIT + 40)) java -Xmx1G -Dfile.encoding=UTF-8 -jar paper.jar --nogui > "$LOG" 2>&1
+) | timeout $((LIMIT + 40)) java -Xmx1G -Dfile.encoding=UTF-8 -Dsun.stdout.encoding=UTF-8 -Dsun.stderr.encoding=UTF-8 -Dstdout.encoding=UTF-8 -jar paper.jar --nogui > "$LOG" 2>&1
 sleep 1
 if ! grep -q "Realms & Res Publica activé" "$LOG"; then
   echo "SERVER: plugin non activé"; tail -n 20 "$LOG"; exit 1

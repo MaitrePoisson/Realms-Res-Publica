@@ -35,6 +35,7 @@ public final class BehaviorScheduler {
     private final WarehouseService warehouse;
     private final VillagerAdapter adapter;
     private final Map<Role, RoleBehavior> behaviors = new EnumMap<>(Role.class);
+    private final java.util.ArrayDeque<Turn> pending = new java.util.ArrayDeque<>();
     private long accumulated;
     private long actions;
 
@@ -69,29 +70,42 @@ public final class BehaviorScheduler {
     /** Repart d'une cadence neuve (tests). */
     public void resetClock() {
         accumulated = 0;
+        pending.clear();
     }
 
     /** Appelé à chaque avance du temps (ticks réels ou accélérés). */
     public void onTicks(long ticks) {
         accumulated += ticks;
         long interval = (long) (config.get().get(SimConfig.Key.BEHAVIOR_INTERVAL_S) * 20);
-        if (accumulated < interval) {
-            return;
-        }
-        long runs = Math.min(MAX_CATCHUP, accumulated / interval);
-        accumulated %= interval;
-        for (VillageSite site : new ArrayList<>(registry.all())) {
-            World w = Bukkit.getWorld(site.worldName());
-            if (w == null) {
-                continue;
-            }
-            for (Villager v : adapter.present(site, w)) {
-                for (long i = 0; i < runs; i++) {
-                    work(site, w, v);
+        if (accumulated >= interval) {
+            long runs = Math.min(MAX_CATCHUP, accumulated / interval);
+            accumulated %= interval;
+            for (VillageSite site : new ArrayList<>(registry.all())) {
+                World w = Bukkit.getWorld(site.worldName());
+                if (w == null) {
+                    continue;
+                }
+                for (Villager v : adapter.present(site, w)) {
+                    pending.add(new Turn(site, w, v, runs));
                 }
             }
         }
+        // Les actions d'une cadence sont étalées sur plusieurs ticks (behaviors_per_tick par tick réel) :
+        // pas de pic de lag toutes les 10 s ; le temps accéléré purge d'un coup tout ce qui est dû.
+        long budget = (long) config.get().get(SimConfig.Key.BEHAVIORS_PER_TICK) * Math.max(1, ticks);
+        while (budget-- > 0 && !pending.isEmpty()) {
+            Turn t = pending.poll();
+            if (!t.villager().isValid()) {
+                continue;
+            }
+            for (long i = 0; i < t.runs(); i++) {
+                work(t.site(), t.world(), t.villager());
+            }
+        }
     }
+
+    /** Tour de travail en attente pour un villageois. */
+    private record Turn(VillageSite site, World world, Villager villager, long runs) { }
 
     /** Fait agir un villageois si son rôle a un comportement et s'il obéit. Renvoie vrai s'il a agi. */
     public boolean work(VillageSite site, World world, Villager villager) {

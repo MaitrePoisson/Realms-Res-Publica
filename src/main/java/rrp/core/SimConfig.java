@@ -51,6 +51,8 @@ public final class SimConfig {
         EXILE_AFTER_S(180, 1, 86400),
         EXILE_FOOD_SHARE(0.3, 0, 1),
         CAMP_GUARD_SHARE(0.4, 0, 1),
+        EXILE_MAX_SHARE(0.5, 0.05, 1),
+        RECONCILE_LOYALTY_BONUS(20, 0, 70),
         CAMP_DISTANCE(80, 20, 1000),
         WAR_AFTER_S(120, 1, 86400),
         WAR_TENSION(60, 0, 200),
@@ -61,8 +63,10 @@ public final class SimConfig {
         // Rôles
         BEHAVIOR_INTERVAL_S(10, 1, 3600),
         WORK_RADIUS(16, 2, 128),
+        BEHAVIORS_PER_TICK(4, 1, 1000),
         RELATIONS_PER_VISIT(5, 0, 100),
         HUT_WOOD(30, 4, 500),
+        BUILDER_SPARE_BEDS(2, 0, 20),
         TALK_LOYALTY_BONUS(2, 0, 50),
         SHOW_ROLE_NAMES(1, 0, 1),
         SHOW_ACTION_BAR(1, 0, 1);

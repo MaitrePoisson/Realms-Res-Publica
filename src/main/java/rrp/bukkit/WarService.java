@@ -260,7 +260,8 @@ public final class WarService {
     private void reconcile(VillageSite village, VillageSite camp) {
         lastEnd = "reconciliation";
         World world = Bukkit.getWorld(village.worldName());
-        double floor = config.get().get(SimConfig.Key.EXILE_LOYALTY) + 20;
+        double floor = config.get().get(SimConfig.Key.EXILE_LOYALTY)
+                + config.get().get(SimConfig.Key.RECONCILE_LOYALTY_BONUS);
         VillageState vs = village.state();
         for (VillagerState s : new ArrayList<>(camp.state().villagers())) {
             s.setFactionId(village.id());

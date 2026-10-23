@@ -13,7 +13,8 @@ import org.junit.jupiter.api.Test;
 import rrp.core.SimConfig.Key;
 
 class CrisisTest {
-    private final SimConfig cfg = SimConfig.defaults();
+    /** Exode total autorisé : les tests d'escalade ne dépendent pas du plafond d'exilés (testé à part). */
+    private final SimConfig cfg = SimConfig.defaults().with(Key.EXILE_MAX_SHARE, 1);
 
     private static VillagerState villager(Role role, double loyalty) {
         return new VillagerState(UUID.randomUUID(), role, "v1", 70, 80, loyalty);
@@ -174,6 +175,26 @@ class CrisisTest {
         s.villagers().add(villager(secondLoyal, 80));
         s.setStock(Resource.FOOD, 0);
         return s;
+    }
+
+    @Test
+    void exileIsCappedAndKeepsAGuardAtHome() {
+        SimConfig capped = SimConfig.defaults(); // plafond par défaut : 50 %
+        VillageState s = new VillageState("v1", Faction.LOYALIST);
+        s.setBeds(9);
+        for (int i = 0; i < 6; i++) {
+            s.villagers().add(villager(i < 2 ? Role.GUARD : Role.FARMER, 5)); // 6 mécontents, dont les 2 gardes
+        }
+        s.villagers().add(villager(Role.FARMER, 80));
+        List<VillageState> w = world(s);
+        for (int i = 0; i < capped.getInt(Key.CONTEST_AFTER_S) + capped.getInt(Key.EXILE_AFTER_S) + 2; i++) {
+            CrisisEngine.step(w, capped, 1.0);
+        }
+        VillageState camp = CrisisEngine.campOf(w, s);
+        assertNotNull(camp);
+        assertTrue(camp.population() <= 3, "plafond de 50 % de 7 : " + camp.population());
+        assertTrue(s.count(Role.GUARD) >= 1, "un garde doit rester au village");
+        assertEquals(0, s.relations());
     }
 
     @Test

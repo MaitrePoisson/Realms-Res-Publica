@@ -286,7 +286,7 @@ final class BehaviorCases {
             check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "bâti sans assez de bois");
             stockWood(p, r, w.world(), 64);
             int wood = stock(r, p, w.world(), Resource.WOOD);
-            r.site().state().setBeds(r.site().state().population());
+            r.site().state().setBeds(r.site().state().population() + (int) p.simConfig().get(rrp.core.SimConfig.Key.BUILDER_SPARE_BEDS));
             check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "bâti alors qu'il y a assez de lits");
             r.site().state().setBeds(1);
             p.adapter().stateOf(r.worker()).setMorale(5);

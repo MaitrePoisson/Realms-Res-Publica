@@ -198,8 +198,23 @@ public final class CrisisEngine {
             }
         }
         leaving.sort(Comparator.comparingDouble(VillagerState::loyalty));
-        while (leaving.size() > v.population() - 1) {
+        int cap = Math.max(1, (int) Math.floor(v.population() * cfg.get(Key.EXILE_MAX_SHARE)));
+        cap = Math.min(cap, v.population() - 1);
+        while (leaving.size() > cap) {
             leaving.remove(leaving.size() - 1);
+        }
+        // Un garde au moins reste fidèle au village (sinon aucun camp ne pourrait jamais lui faire la guerre).
+        if (v.count(Role.GUARD) > 0 && v.count(Role.GUARD) == leaving.stream().filter(s -> s.role() == Role.GUARD).count()) {
+            for (int i = leaving.size() - 1; i >= 0; i--) {
+                if (leaving.get(i).role() == Role.GUARD) {
+                    leaving.remove(i);
+                    break;
+                }
+            }
+        }
+        if (leaving.isEmpty()) {
+            v.setExileTimer(v.exileTimer() - cfg.get(Key.EXILE_AFTER_S) / 2);
+            return;
         }
         VillageState camp = campOf(world, v);
         if (camp == null) {
@@ -228,6 +243,9 @@ public final class CrisisEngine {
             ids.add(s.id());
         }
         camp.setBeds(camp.beds() + leaving.size());
+        // La rupture remet les relations à zéro : seul le diplomate peut les rebâtir.
+        v.setRelations(0);
+        camp.setRelations(0);
         v.setExileTimer(cfg.get(Key.EXILE_AFTER_S));
         change(v, CrisisLevel.EXIL, events);
         events.add(new SimEvent.Exile(v.id(), List.copyOf(ids), camp.id(), food));

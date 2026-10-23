@@ -2,8 +2,10 @@ package rrp.bukkit.behaviors;
 
 import org.bukkit.Location;
 import rrp.bukkit.VillageSite;
+import rrp.core.Faction;
 import rrp.core.Role;
 import rrp.core.SimConfig;
+import rrp.core.VillageState;
 import rrp.core.VillagerState;
 
 /**
@@ -41,7 +43,24 @@ public final class Diplomat extends RoleBehavior {
         return talked;
     }
 
+    /** En pleine rupture, le diplomate négocie avec l'autre camp (campement du village, ou village du campement). */
+    private static VillageSite counterpart(BehaviorContext ctx) {
+        VillageState mine = ctx.site().state();
+        for (VillageSite s : ctx.registry().all()) {
+            VillageState o = s.state();
+            if (s != ctx.site() && (o.faction() == Faction.DISSIDENT && mine.id().equals(o.parentId())
+                    || mine.faction() == Faction.DISSIDENT && o.id().equals(mine.parentId()))) {
+                return s;
+            }
+        }
+        return null;
+    }
+
     private static VillageSite nearestNeighbour(BehaviorContext ctx) {
+        VillageSite other = counterpart(ctx);
+        if (other != null) {
+            return other;
+        }
         Location at = ctx.site().center(ctx.world());
         VillageSite best = null;
         double bestDistance = Double.MAX_VALUE;

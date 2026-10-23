@@ -82,6 +82,9 @@ public final class ScenarioRunner {
         sample(sim, 0, samples);
         double nextSample = SAMPLE_S;
         for (double t = STEP_S; t <= sc.durationS() + 1e-9; t += STEP_S) {
+            for (VillageState v : List.copyOf(sim.villages())) {
+                diplomacy(sim.villages(), v, cfg, STEP_S);
+            }
             for (VillageState v : sim.villages()) {
                 economy(v, sc.economy(), cfg, accs.computeIfAbsent(v.id(), k -> new Acc()), STEP_S);
             }
@@ -98,6 +101,22 @@ public final class ScenarioRunner {
             }
         }
         return new Result(sc, samples, events);
+    }
+
+    /** Un diplomate qui obéit négocie avec l'autre camp d'une rupture : +relations_per_visit toutes les behavior_interval_s. */
+    private static void diplomacy(List<VillageState> world, VillageState v, SimConfig cfg, double dt) {
+        if (v.faction() != rrp.core.Faction.LOYALIST) {
+            return;
+        }
+        VillageState camp = rrp.core.CrisisEngine.campOf(world, v);
+        if (camp == null) {
+            return;
+        }
+        long diplomats = v.villagers().stream().filter(s -> s.role() == Role.DIPLOMAT && Gauges.canWork(s, cfg)).count()
+                + camp.villagers().stream().filter(s -> s.role() == Role.DIPLOMAT && Gauges.canWork(s, cfg)).count();
+        double gain = diplomats * cfg.get(SimConfig.Key.RELATIONS_PER_VISIT) * dt / cfg.get(SimConfig.Key.BEHAVIOR_INTERVAL_S);
+        v.setRelations(v.relations() + gain);
+        camp.setRelations(camp.relations() + gain);
     }
 
     private static VillagerState newborn(VillageState v) {
@@ -142,7 +161,7 @@ public final class ScenarioRunner {
         v.addStock(Resource.WOOD, wood);
 
         // Les bâtisseurs ne construisent que si le village manque de lits (marge de 2).
-        if (builders > 0 && v.beds() < v.population() + 2) {
+        if (builders > 0 && v.beds() < v.population() + (int) cfg.get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
             a.bedTimer += dt * builders;
             while (a.bedTimer >= eco.bedBuildSeconds() && v.stock(Resource.WOOD) >= eco.woodPerBed()) {
                 a.bedTimer -= eco.bedBuildSeconds();
