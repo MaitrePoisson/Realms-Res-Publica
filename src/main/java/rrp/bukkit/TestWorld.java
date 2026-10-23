@@ -139,7 +139,8 @@ public final class TestWorld {
         }
     }
 
-    private void remember(Block b) {
+    /** Mémorise l'état d'un bloc avant qu'un service le modifie, pour {@link #cleanup()}. */
+    public void remember(Block b) {
         changed.putIfAbsent(b, b.getBlockData());
     }
 

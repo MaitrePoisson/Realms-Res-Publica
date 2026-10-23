@@ -71,6 +71,14 @@ public final class VillageRegistry {
         return s;
     }
 
+    /** Enregistre un état déjà créé par le cœur (campement dissident issu d'un exil) à l'emplacement donné. */
+    public VillageSite adopt(VillageState state, Location center, int radius) {
+        VillageSite s = new VillageSite(state, center.getWorld().getName(), center.getX(), center.getY(), center.getZ(), radius);
+        restore(s);
+        dirty = true;
+        return s;
+    }
+
     /** Ajoute un village déjà construit (rechargement) ; met à jour le compteur d'identifiants. */
     void restore(VillageSite s) {
         sites.put(s.id(), s);
