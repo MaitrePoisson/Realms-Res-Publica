@@ -139,6 +139,11 @@ public final class TestWorld {
         }
     }
 
+    /** Fait retirer par {@link #cleanup()} une entité apparue hors de ce helper (par exemple par une commande). */
+    public void track(Entity e) {
+        entities.add(e);
+    }
+
     /** Mémorise l'état d'un bloc avant qu'un service le modifie, pour {@link #cleanup()}. */
     public void remember(Block b) {
         changed.putIfAbsent(b, b.getBlockData());

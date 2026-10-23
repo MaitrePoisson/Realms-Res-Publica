@@ -34,6 +34,11 @@ public final class Selftest {
         cases.add(c);
     }
 
+    /** Noms des cas enregistrés. */
+    public List<String> names() {
+        return cases.stream().map(SelftestCase::name).toList();
+    }
+
     private record Outcome(String name, boolean ok, String message, long millis) {
     }
 

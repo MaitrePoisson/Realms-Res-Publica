@@ -20,7 +20,8 @@ import java.util.UUID;
 /** Commande `/respublica` : sous-commandes de debug et de test. */
 public final class Commands implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBS = List.of("help", "selftest", "tick", "village", "warehouse", "status", "inspect", "setrole");
+    private static final List<String> SUBS = List.of("help", "selftest", "tick", "village", "warehouse", "status", "inspect", "setrole",
+            "famine", "overpopulate", "insecurity", "reload");
 
     private final RrpPlugin plugin;
     private final TickService ticks;
@@ -50,6 +51,10 @@ public final class Commands implements CommandExecutor, TabCompleter {
             case "status" -> status(sender, args);
             case "inspect" -> inspect(sender, args);
             case "setrole" -> setRole(sender, args);
+            case "famine" -> famine(sender, args);
+            case "overpopulate" -> overpopulate(sender, args);
+            case "insecurity" -> insecurity(sender, args);
+            case "reload" -> reload(sender);
             default -> sender.sendMessage(lang.msg("error.unknown", sub));
         }
         return true;
@@ -215,6 +220,83 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage(lang.msg("setrole.done", role.label()));
     }
 
+    /** Village désigné par l'argument {@code index} (identifiant) ou, à défaut, celui où se trouve le joueur. */
+    private VillageSite siteArg(CommandSender sender, String[] args, int index) {
+        if (args.length > index) {
+            return plugin.registry().get(args[index]);
+        }
+        return sender instanceof Player p ? plugin.registry().find(p.getLocation()) : null;
+    }
+
+    /** Vide réellement le stock de nourriture du tonneau-entrepôt : la famine suit par les voies normales. */
+    private void famine(CommandSender sender, String[] args) {
+        VillageSite site = siteArg(sender, args, 1);
+        if (site == null) {
+            sender.sendMessage(lang.msg("error.usage_crisis", "famine"));
+            return;
+        }
+        org.bukkit.World world = org.bukkit.Bukkit.getWorld(site.worldName());
+        if (!site.hasWarehouse() || world == null) {
+            sender.sendMessage(lang.msg("debug.no_warehouse", site.id()));
+            return;
+        }
+        int removed = plugin.warehouse().withdraw(site, world, Resource.FOOD, Integer.MAX_VALUE);
+        plugin.warehouse().refresh(site, world);
+        sender.sendMessage(lang.msg("debug.famine", site.id(), removed));
+    }
+
+    /** Fait apparaître de vrais villageois adultes jusqu'à dépasser lits × ratio. */
+    private void overpopulate(CommandSender sender, String[] args) {
+        VillageSite site = siteArg(sender, args, 1);
+        org.bukkit.World world = site == null ? null : org.bukkit.Bukkit.getWorld(site.worldName());
+        if (world == null) {
+            sender.sendMessage(lang.msg("error.usage_crisis", "overpopulate"));
+            return;
+        }
+        double limit = site.state().beds() * plugin.simConfig().get(rrp.core.SimConfig.Key.OVERPOPULATION_RATIO);
+        int missing = (int) Math.floor(limit) + 1 - site.state().population();
+        int n = Math.max(1, Math.min(missing, 40));
+        org.bukkit.Location at = site.center(world);
+        for (int i = 0; i < n; i++) {
+            world.spawnEntity(at.clone().add((i % 5) - 2, 1, (i / 5) % 5 - 2), org.bukkit.entity.EntityType.VILLAGER);
+        }
+        plugin.adapter().sync(site, world);
+        plugin.scanner().refreshNow(site);
+        sender.sendMessage(lang.msg("debug.overpopulate", site.id(), n, site.state().population(), site.state().beds()));
+    }
+
+    /** Fait apparaître des monstres persistants (qui ne brûlent pas) en nombre supérieur à ce que les gardes couvrent. */
+    private void insecurity(CommandSender sender, String[] args) {
+        VillageSite site = siteArg(sender, args, 1);
+        org.bukkit.World world = site == null ? null : org.bukkit.Bukkit.getWorld(site.worldName());
+        if (world == null) {
+            sender.sendMessage(lang.msg("error.usage_crisis", "insecurity"));
+            return;
+        }
+        double covered = site.state().count(Role.GUARD)
+                * plugin.simConfig().get(rrp.core.SimConfig.Key.INSECURITY_THREATS_PER_GUARD);
+        int n = Math.max(1, Math.min((int) Math.floor(covered) + 1 - site.state().threats(), 20));
+        org.bukkit.Location at = site.center(world);
+        double reach = Math.max(2, site.radius() / 2.0);
+        for (int i = 0; i < n; i++) {
+            double a = 2 * Math.PI * i / n;
+            int x = (int) Math.round(at.getX() + reach * Math.cos(a));
+            int z = (int) Math.round(at.getZ() + reach * Math.sin(a));
+            org.bukkit.Location l = new org.bukkit.Location(world, x + 0.5, world.getHighestBlockYAt(x, z) + 1, z + 0.5);
+            org.bukkit.entity.Zombie z0 = world.spawn(l, org.bukkit.entity.Zombie.class);
+            z0.setShouldBurnInDay(false);
+            z0.setPersistent(true);
+            z0.setRemoveWhenFarAway(false);
+        }
+        site.state().setThreats(plugin.gauges().countThreats(site, world));
+        sender.sendMessage(lang.msg("debug.insecurity", site.id(), n, site.state().threats()));
+    }
+
+    private void reload(CommandSender sender) {
+        plugin.loadSimConfig();
+        sender.sendMessage(lang.msg("reload.done"));
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> out = new ArrayList<>();
@@ -232,7 +314,7 @@ public final class Commands implements CommandExecutor, TabCompleter {
             for (Role r : Role.values()) {
                 out.add(r.name().toLowerCase(Locale.ROOT));
             }
-        } else if (args.length == 2 && args[0].equalsIgnoreCase("status")) {
+        } else if (args.length == 2 && List.of("status", "famine", "overpopulate", "insecurity").contains(args[0].toLowerCase(Locale.ROOT))) {
             plugin.registry().all().forEach(v -> out.add(v.id()));
         }
         return out;

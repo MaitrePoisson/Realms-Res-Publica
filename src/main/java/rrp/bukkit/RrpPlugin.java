@@ -47,6 +47,8 @@ public final class RrpPlugin extends JavaPlugin {
         BirthCases.all().forEach(selftest::register);
         CrisisCases.all().forEach(selftest::register);
         WarCases.all().forEach(selftest::register);
+        CommandCases.all().forEach(selftest::register);
+        selftest.register(CommandCases.coverage());
         Commands commands = new Commands(this);
         PluginCommand cmd = getCommand("respublica");
         if (cmd != null) {
