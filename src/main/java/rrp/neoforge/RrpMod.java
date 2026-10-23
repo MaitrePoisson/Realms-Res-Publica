@@ -5,7 +5,14 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.loading.FMLPaths;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.entity.npc.Villager;
+import net.minecraft.world.level.storage.LevelResource;
+import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.entity.EntityLeaveLevelEvent;
+import net.neoforged.neoforge.event.entity.living.BabyEntitySpawnEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import org.slf4j.Logger;
@@ -22,9 +29,27 @@ public final class RrpMod {
     private static volatile SimConfig simConfig = SimConfig.defaults();
     private static volatile Lang lang;
 
-    public RrpMod() {
+    private static MinecraftServer server;
+    private static final TickService TICKS = new TickService();
+    private static final VillageRegistry REGISTRY = new VillageRegistry();
+    private static final WarehouseService WAREHOUSE = new WarehouseService(REGISTRY);
+    private static VillagerAdapter adapter;
+    private static VillageScanner scanner;
+    private static Persistence persistence;
+
+    public RrpMod(IEventBus modBus) {
+        RrpAttachments.REGISTER.register(modBus);
+        VillageCommands.install();
         LOG.info("Realms & Res Publica chargé");
     }
+
+    public static MinecraftServer server() { return server; }
+    public static TickService ticks() { return TICKS; }
+    public static VillageRegistry registry() { return REGISTRY; }
+    public static WarehouseService warehouse() { return WAREHOUSE; }
+    public static VillagerAdapter adapter() { return adapter; }
+    public static VillageScanner scanner() { return scanner; }
+    public static Persistence persistence() { return persistence; }
 
     public static SimConfig simConfig() {
         return simConfig;
@@ -43,6 +68,41 @@ public final class RrpMod {
     public static void onServerStarting(ServerStartingEvent event) {
         lang = new Lang(LOG);
         reloadConfig();
+        server = event.getServer();
+        adapter = new VillagerAdapter(RrpMod::simConfig, RrpMod::server, REGISTRY);
+        scanner = new VillageScanner(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
+        persistence = new Persistence(REGISTRY, server.getWorldPath(LevelResource.ROOT).resolve(MOD_ID), LOG);
+        int loaded = persistence.load();
+        TICKS.register(worldTimer);
+        LOG.info("{} village(s) rechargé(s)", loaded);
+    }
+
+    /** Minuteur du mod : tout ce qui avance avec le temps passe par ici (tick réel ou accéléré). */
+    private static final java.util.function.LongConsumer worldTimer = t -> {
+        scanner.onTicks(t);
+        persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
+    };
+
+    @SubscribeEvent
+    public static void onServerTick(ServerTickEvent.Post event) {
+        if (server != null && persistence != null) {
+            TICKS.advance(1);
+        }
+    }
+
+    /** Les naissances vanilla sont remplacées par celles du mod (conditions réelles). */
+    @SubscribeEvent
+    public static void onBaby(BabyEntitySpawnEvent event) {
+        if (event.getChild() instanceof Villager) {
+            event.setCanceled(true);
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLeave(EntityLeaveLevelEvent event) {
+        if (adapter != null) {
+            adapter.onLeave(event.getEntity());
+        }
     }
 
     @SubscribeEvent
@@ -52,6 +112,13 @@ public final class RrpMod {
 
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
+        TICKS.unregister(worldTimer);
+        if (persistence != null) {
+            adapter.saveAll();
+            persistence.flush();
+        }
+        scanner.clear();
+        server = null;
         LOG.info("Realms & Res Publica désactivé");
     }
 }
