@@ -11,6 +11,7 @@ import net.minecraft.world.level.block.state.properties.BedPart;
 import rrp.core.Resource;
 import rrp.core.Role;
 import rrp.core.SimConfig;
+import rrp.neoforge.TownHall;
 import rrp.neoforge.Worlds;
 
 /**
@@ -31,6 +32,9 @@ public final class Builder extends RoleBehavior {
 
     @Override
     public boolean runOnce(BehaviorContext ctx) {
+        if (!ctx.site().hasHall()) {
+            return buildTownHall(ctx);
+        }
         if (!ctx.site().hasWarehouse() || ctx.site().state().beds()
                 >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
             return false;
@@ -49,6 +53,19 @@ public final class Builder extends RoleBehavior {
         walkToward(ctx, origin);
         build(ctx.level(), origin);
         ctx.site().state().setBeds(ctx.site().state().beds() + 1);
+        ctx.registry().markDirty();
+        return true;
+    }
+
+    /** Tout village a un Hôtel de Ville : à défaut, le bâtisseur en pose un près du centre. */
+    private boolean buildTownHall(BehaviorContext ctx) {
+        BlockPos base = TownHall.findSpot(ctx.level(), ctx.site());
+        if (base == null) {
+            return false;
+        }
+        walkToward(ctx, base);
+        TownHall.build(ctx.level(), base);
+        ctx.site().setHall(base.getX(), base.getY(), base.getZ());
         ctx.registry().markDirty();
         return true;
     }

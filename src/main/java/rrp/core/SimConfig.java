@@ -66,6 +66,7 @@ public final class SimConfig {
         BEHAVIORS_PER_TICK(4, 1, 1000),
         RELATIONS_PER_VISIT(5, 0, 100),
         HUT_WOOD(30, 4, 500),
+        TOWN_HALL_RADIUS(12, 4, 64),
         BUILDER_SPARE_BEDS(2, 0, 20),
         TALK_LOYALTY_BONUS(2, 0, 50),
         SHOW_ROLE_NAMES(1, 0, 1),

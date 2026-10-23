@@ -35,6 +35,7 @@ class PersistenceTest {
         s.state().setContestTimer(12.5);
         s.state().setRelations(30);
         s.setWarehouse(3, 64, -7);
+        s.setHall(1, 65, -2);
         VillageSite camp = reg.create("minecraft:overworld", 100, 70, 100, 16, Faction.DISSIDENT);
         camp.state().setParentId(s.id());
         assertTrue(persistence(reg).flush());
@@ -51,6 +52,10 @@ class PersistenceTest {
         assertEquals(-20.25, r.z());
         assertEquals(3, r.warehouse()[0]);
         assertEquals(-7, r.warehouse()[2]);
+        assertEquals(65, r.hall()[1]);
+        assertTrue(r.inCore("minecraft:overworld", 2, -1, 12));
+        assertFalse(r.inCore("minecraft:overworld", 40, -1, 12));
+        assertFalse(back.get(camp.id()).hasHall());
         assertEquals(s.id(), back.get(camp.id()).state().parentId());
         assertEquals(Faction.DISSIDENT, back.get(camp.id()).state().faction());
         // the id counter continues after the reloaded ones

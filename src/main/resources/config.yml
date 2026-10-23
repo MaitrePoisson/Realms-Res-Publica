@@ -105,6 +105,8 @@ behaviors_per_tick: 4
 relations_per_visit: 5
 # Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]
 hut_wood: 30
+# Rayon (blocs) du cœur du village autour de l'Hôtel de Ville. [4 ; 64]
+town_hall_radius: 12
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

@@ -26,7 +26,7 @@ public final class Commands {
     /** Niveau de permission vanilla requis (opérateur). */
     public static final int PERMISSION_LEVEL = 2;
 
-    static final List<String> SUBS = List.of("help", "tick", "village", "warehouse", "status", "inspect", "setrole",
+    static final List<String> SUBS = List.of("help", "tick", "village", "warehouse", "townhall", "status", "inspect", "setrole",
             "famine", "overpopulate", "insecurity", "reload");
 
     /** Corps d'une sous-commande : {@code args[0]} est le nom de la sous-commande. */
@@ -78,7 +78,7 @@ public final class Commands {
         String sub = args.length == 0 || args[0].isEmpty() ? "help" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "help" -> help(source);
-            case "tick", "village", "warehouse", "status", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
+            case "tick", "village", "warehouse", "townhall", "status", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
                 Handler h = HANDLERS.get(sub);
                 if (h == null) {
                     reply(source, lang.msg("error.not_ready", sub));

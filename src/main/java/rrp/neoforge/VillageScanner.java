@@ -64,6 +64,7 @@ public final class VillageScanner {
         BlockEntity[] current;
         int index;
         int beds;
+        BlockPos hall;
 
         Job(String worldName, double x, double y, double z, int radius, String siteId, int villagers) {
             this.worldName = worldName;
@@ -231,6 +232,11 @@ public final class VillageScanner {
                         && Math.hypot(p.getX() + 0.5 - j.x, p.getZ() + 0.5 - j.z) <= j.radius) {
                     j.beds++;
                 }
+                if (j.hall == null && st.is(net.minecraft.world.level.block.Blocks.LECTERN)
+                        && w.getBlockState(p.below()).is(net.minecraft.world.level.block.Blocks.GOLD_BLOCK)
+                        && Math.hypot(p.getX() + 0.5 - j.x, p.getZ() + 0.5 - j.z) <= j.radius) {
+                    j.hall = p.below();
+                }
             }
             if (j.index >= j.current.length) {
                 j.current = null;
@@ -245,6 +251,11 @@ public final class VillageScanner {
             VillageSite s = registry.get(j.siteId);
             if (s != null) {
                 s.state().setBeds(j.beds);
+                if (j.hall != null) {
+                    s.setHall(j.hall.getX(), j.hall.getY(), j.hall.getZ());
+                } else if (s.hasHall() && w != null && !TownHall.isHall(w, new BlockPos(s.hall()[0], s.hall()[1], s.hall()[2]))) {
+                    s.clearHall(); // détruit : le bâtisseur en refera un
+                }
                 if (w != null) {
                     warehouse.refresh(s, w);
                     adapter.sync(s, w);
@@ -262,6 +273,9 @@ public final class VillageScanner {
         }
         VillageSite s = registry.create(j.worldName, j.x, j.y, j.z, j.radius);
         s.state().setBeds(j.beds);
+        if (j.hall != null) {
+            s.setHall(j.hall.getX(), j.hall.getY(), j.hall.getZ());
+        }
         registry.mergeNearby();
         if (registry.get(s.id()) != null) {
             adapter.sync(s, w);

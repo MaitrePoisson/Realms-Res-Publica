@@ -140,6 +140,14 @@ public final class Persistence {
         o.addProperty("y", s.y());
         o.addProperty("z", s.z());
         o.addProperty("radius", s.radius());
+        if (s.hasHall()) {
+            int[] h = s.hall();
+            JsonArray a = new JsonArray();
+            a.add(h[0]);
+            a.add(h[1]);
+            a.add(h[2]);
+            o.add("hall", a);
+        }
         if (s.hasWarehouse()) {
             int[] w = s.warehouse();
             JsonArray a = new JsonArray();
@@ -193,6 +201,10 @@ public final class Persistence {
         }
         VillageSite s = new VillageSite(st, o.get("world").getAsString(), o.get("x").getAsDouble(),
                 o.get("y").getAsDouble(), o.get("z").getAsDouble(), (int) num(o, "radius", 24));
+        if (o.has("hall")) {
+            JsonArray a = o.getAsJsonArray("hall");
+            s.setHall(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
+        }
         if (o.has("warehouse")) {
             JsonArray a = o.getAsJsonArray("warehouse");
             s.setWarehouse(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());

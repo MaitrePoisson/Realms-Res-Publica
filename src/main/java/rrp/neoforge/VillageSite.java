@@ -15,6 +15,8 @@ public final class VillageSite {
     private int warReach;
     /** Coordonnées du tonneau-entrepôt, ou {@code null} tant qu'aucun n'est désigné. */
     private int[] warehouse;
+    /** Coordonnées du bloc d'or de l'Hôtel de Ville, ou {@code null} tant qu'il n'existe pas. */
+    private int[] hall;
 
     public VillageSite(VillageState state, String worldName, double x, double y, double z, int radius) {
         this.state = state;
@@ -42,6 +44,22 @@ public final class VillageSite {
 
     public void setWarehouse(int bx, int by, int bz) {
         this.warehouse = new int[] {bx, by, bz};
+    }
+
+    public int[] hall() { return hall == null ? null : hall.clone(); }
+    public boolean hasHall() { return hall != null; }
+
+    public void setHall(int bx, int by, int bz) {
+        this.hall = new int[] {bx, by, bz};
+    }
+
+    public void clearHall() {
+        this.hall = null;
+    }
+
+    /** Vrai si le point est dans le cœur (rayon {@code coreRadius} autour de l'Hôtel de Ville) ; faux sans hôtel de ville. */
+    public boolean inCore(String world, double px, double pz, int coreRadius) {
+        return hall != null && worldName.equals(world) && Math.hypot(px - (hall[0] + 0.5), pz - (hall[2] + 0.5)) <= coreRadius;
     }
 
     public void clearWarehouse() {

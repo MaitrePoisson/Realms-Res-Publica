@@ -27,6 +27,7 @@ final class VillageCommands {
         Commands.register("tick", VillageCommands::tick);
         Commands.register("village", VillageCommands::village);
         Commands.register("warehouse", VillageCommands::warehouse);
+        Commands.register("townhall", VillageCommands::townHall);
         Commands.register("status", VillageCommands::status);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
@@ -131,6 +132,60 @@ final class VillageCommands {
         RrpMod.warehouse().set(site, level, target);
         RrpMod.warehouse().refresh(site, level);
         Commands.reply(src, lang.msg("warehouse.set", site.id(), target.getX(), target.getY(), target.getZ()));
+    }
+
+    /** {@code townhall info|set [x y z]|build} : consulte, désigne (bloc d'or) ou fait poser l'Hôtel de Ville du village courant. */
+    private static void townHall(CommandSourceStack src, String[] args) {
+        Lang lang = RrpMod.lang();
+        String action = args.length < 2 ? "info" : args[1].toLowerCase(Locale.ROOT);
+        ServerLevel level = src.getLevel();
+        Vec3 pos = src.getPosition();
+        VillageSite site = RrpMod.registry().find(Worlds.name(level), pos.x, pos.z);
+        if (site == null) {
+            Commands.reply(src, lang.msg("warehouse.no_village"));
+            return;
+        }
+        int core = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.TOWN_HALL_RADIUS);
+        switch (action) {
+            case "info" -> {
+                if (!site.hasHall()) {
+                    Commands.reply(src, lang.msg("townhall.none", site.id()));
+                } else {
+                    int[] h = site.hall();
+                    Commands.reply(src, lang.msg("townhall.info", site.id(), h[0], h[1], h[2], core));
+                }
+            }
+            case "set" -> {
+                BlockPos base;
+                try {
+                    base = args.length >= 5
+                            ? new BlockPos(Integer.parseInt(args[2]), Integer.parseInt(args[3]), Integer.parseInt(args[4]))
+                            : BlockPos.containing(pos).below();
+                } catch (NumberFormatException e) {
+                    Commands.reply(src, lang.msg("error.usage_townhall"));
+                    return;
+                }
+                if (!TownHall.isHall(level, base)) {
+                    Commands.reply(src, lang.msg("townhall.invalid"));
+                    return;
+                }
+                site.setHall(base.getX(), base.getY(), base.getZ());
+                RrpMod.registry().markDirty();
+                Commands.reply(src, lang.msg("townhall.set", site.id(), base.getX(), base.getY(), base.getZ()));
+            }
+            case "build" -> {
+                BlockPos base = TownHall.findSpot(level, site);
+                if (base == null) {
+                    Commands.reply(src, lang.msg("townhall.no_spot"));
+                    return;
+                }
+                TownHall.build(level, base);
+                site.setHall(base.getX(), base.getY(), base.getZ());
+                RrpMod.registry().markDirty();
+                Commands.reply(src, lang.msg("townhall.built", site.id(), base.getX(), base.getY(), base.getZ()));
+            }
+            default -> Commands.reply(src, lang.msg("error.usage_townhall"));
+        }
     }
 
     /** Pour la console : le tonneau le plus proche (6 blocs) de la position de la commande, ou {@code null}. */

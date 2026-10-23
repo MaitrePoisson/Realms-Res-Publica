@@ -23,6 +23,8 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import rrp.core.Role;
 import rrp.core.SimEvent;
+import rrp.neoforge.TownHall;
+import rrp.neoforge.Worlds;
 import rrp.neoforge.RrpMod;
 import rrp.neoforge.VillageSite;
 
@@ -151,6 +153,30 @@ public final class RrpGameTests {
         h.assertTrue(site.hasWarehouse(), "warehouse");
         h.assertTrue(cmd(h, "rrp village list").contains(site.id()), "village list");
         h.assertTrue(cmd(h, "rrp status " + site.id()).contains("Villageois : 2"), "status");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void townHall(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 32);
+        h.assertTrue(!site.hasHall(), "no hall yet");
+        h.assertTrue(cmd(h, "rrp townhall info").contains("pas encore"), "info without hall");
+        h.assertTrue(cmd(h, "rrp townhall build").contains("posé"), "hall built by command");
+        h.assertTrue(site.hasHall(), "hall registered");
+        int[] p = site.hall();
+        h.assertTrue(TownHall.isHall(h.getLevel(), new BlockPos(p[0], p[1], p[2])), "gold block under lectern");
+        // the scanner adopts a hall placed in the world
+        site.clearHall();
+        RrpMod.scanner().refreshNow(site);
+        h.assertTrue(site.hasHall(), "scanner detects the hall");
+        // destroyed hall is forgotten, then the builder makes a new one
+        h.getLevel().setBlock(new BlockPos(p[0], p[1], p[2]), Blocks.AIR.defaultBlockState(), 3);
+        RrpMod.scanner().refreshNow(site);
+        h.assertTrue(!site.hasHall(), "destroyed hall forgotten");
+        setAll(h, Role.BUILDER);
+        h.assertTrue(act(h, site), "builder did nothing");
+        h.assertTrue(site.hasHall(), "builder rebuilt the hall");
+        h.assertTrue(site.inCore(Worlds.name(h.getLevel()), site.hall()[0], site.hall()[2], 12), "core contains hall");
         h.succeed();
     }
 
