@@ -268,6 +268,16 @@ public final class VillageScanner {
         }
     }
 
+    /** Commande de debug : repart de zéro et exécute toute la passe tout de suite (hors budget). */
+    public void scanNow() {
+        jobs.clear();
+        enqueueAll();
+        int guard = 100_000;
+        while (!jobs.isEmpty() && guard-- > 0) {
+            step();
+        }
+    }
+
     /**
      * Passe complète immédiate (hors budget) pour un village : lits et stock à jour. Réservé aux
      * commandes de debug et aux tests ; le fonctionnement normal reste budgété.

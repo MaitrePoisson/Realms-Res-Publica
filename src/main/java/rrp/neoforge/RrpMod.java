@@ -35,6 +35,9 @@ public final class RrpMod {
     private static final WarehouseService WAREHOUSE = new WarehouseService(REGISTRY);
     private static VillagerAdapter adapter;
     private static VillageScanner scanner;
+    private static GaugeTicker gauges;
+    private static BirthService births;
+    private static ActionBarService actionBar;
     private static Persistence persistence;
 
     public RrpMod(IEventBus modBus) {
@@ -49,6 +52,9 @@ public final class RrpMod {
     public static WarehouseService warehouse() { return WAREHOUSE; }
     public static VillagerAdapter adapter() { return adapter; }
     public static VillageScanner scanner() { return scanner; }
+    public static GaugeTicker gauges() { return gauges; }
+    public static BirthService births() { return births; }
+    public static ActionBarService actionBar() { return actionBar; }
     public static Persistence persistence() { return persistence; }
 
     public static SimConfig simConfig() {
@@ -71,6 +77,9 @@ public final class RrpMod {
         server = event.getServer();
         adapter = new VillagerAdapter(RrpMod::simConfig, RrpMod::server, REGISTRY);
         scanner = new VillageScanner(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
+        gauges = new GaugeTicker(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
+        births = new BirthService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
+        actionBar = new ActionBarService(RrpMod::simConfig, RrpMod::server, REGISTRY, RrpMod::lang);
         persistence = new Persistence(REGISTRY, server.getWorldPath(LevelResource.ROOT).resolve(MOD_ID), LOG);
         int loaded = persistence.load();
         TICKS.register(worldTimer);
@@ -80,6 +89,9 @@ public final class RrpMod {
     /** Minuteur du mod : tout ce qui avance avec le temps passe par ici (tick réel ou accéléré). */
     private static final java.util.function.LongConsumer worldTimer = t -> {
         scanner.onTicks(t);
+        gauges.onTicks(t);
+        actionBar.onTicks(t);
+        births.onTicks(t);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };
 

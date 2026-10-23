@@ -63,8 +63,7 @@ final class VillageCommands {
                 }
             }
             case "scan" -> {
-                RrpMod.scanner().enqueueAll();
-                RrpMod.ticks().advance(1);
+                RrpMod.scanner().scanNow();
                 Commands.reply(src, lang.msg("village.scan"));
             }
             case "flush" -> {
