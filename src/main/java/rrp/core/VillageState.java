@@ -12,6 +12,7 @@ import java.util.Map;
 public final class VillageState {
     private final String id;
     private final Faction faction;
+    private String parentId;
     private int beds;
     private int threats;
     private double relations;
@@ -35,6 +36,9 @@ public final class VillageState {
 
     public String id() { return id; }
     public Faction faction() { return faction; }
+    /** Pour un campement dissident : id du village d'origine ; sinon {@code null}. */
+    public String parentId() { return parentId; }
+    public void setParentId(String parentId) { this.parentId = parentId; }
     public int beds() { return beds; }
     public void setBeds(int beds) { this.beds = Math.max(0, beds); }
     public int threats() { return threats; }

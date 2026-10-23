@@ -13,8 +13,12 @@ public sealed interface SimEvent {
     /** Le niveau de crise du village a changé. */
     record CrisisChanged(String villageId, CrisisLevel from, CrisisLevel to) implements SimEvent { }
 
-    /** Des mécontents quittent le village pour fonder un campement. */
-    record Exile(String villageId, List<UUID> villagerIds) implements SimEvent { }
+    /**
+     * Des mécontents quittent le village pour fonder (ou rejoindre) le campement {@code campId}. L'état du
+     * campement existe déjà dans le cœur avec ses exilés et {@code foodMoved} unités de nourriture ; la
+     * couche Bukkit déplace les entités et construit le campement.
+     */
+    record Exile(String villageId, List<UUID> villagerIds, String campId, int foodMoved) implements SimEvent { }
 
     /** La guerre civile éclate entre le village et son campement dissident. */
     record WarStarted(String villageId, String otherVillageId) implements SimEvent { }
