@@ -13,9 +13,17 @@ import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.neoforge.TownHall;
 import rrp.neoforge.Worlds;
+import rrp.neoforge.urban.BlueprintPool;
+import rrp.neoforge.urban.BuildOrder;
+import rrp.neoforge.urban.ConstructionSite;
+import rrp.neoforge.urban.TerrainLeveler;
+
+import java.util.Optional;
 
 /**
- * Consomme du bois de l'entrepôt pour bâtir une petite hutte (4×3, murs de 2 blocs, toit, porte ouverte
+ * Mène les chantiers du village : prend l'ordre de l'intendant, choisit et nivelle un emplacement dans les
+ * frontières, puis pose le plan rangée par rangée sur plusieurs actions, avec les matériaux du stock communautaire.
+ * Sans ordre, il consomme du bois de l'entrepôt pour bâtir une petite hutte (4×3, murs de 2 blocs, toit, porte ouverte
  * à l'ouest) contenant un vrai lit. Il ne bâtit que s'il manque des lits au village.
  */
 public final class Builder extends RoleBehavior {
@@ -24,6 +32,11 @@ public final class Builder extends RoleBehavior {
     static final int DEPTH = 3;
     /** Hauteur libre exigée au-dessus du sol (murs de 2 + toit). */
     static final int HEIGHT = 3;
+
+    /** Pas de chantier (rangées) réalisés à chaque action du bâtisseur. */
+    static final int STEPS_PER_ACTION = 6;
+    /** Distance maximale (anneaux) de la recherche d'emplacement autour de la cible de l'ordre. */
+    static final int SEARCH_RING = 14;
 
     @Override
     public Role role() {
@@ -34,6 +47,9 @@ public final class Builder extends RoleBehavior {
     public boolean runOnce(BehaviorContext ctx) {
         if (!ctx.site().hasHall()) {
             return buildTownHall(ctx);
+        }
+        if (ctx.site().hasWarehouse() && (ctx.site().construction() != null || !ctx.site().orders().isEmpty())) {
+            return construct(ctx);
         }
         if (!ctx.site().hasWarehouse() || ctx.site().state().beds()
                 >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
@@ -55,6 +71,78 @@ public final class Builder extends RoleBehavior {
         ctx.site().state().setBeds(ctx.site().state().beds() + 1);
         ctx.registry().markDirty();
         return true;
+    }
+
+    /** Démarre (si besoin) puis fait avancer le chantier. Renvoie vrai si quelque chose a été fait. */
+    private boolean construct(BehaviorContext ctx) {
+        var site = ctx.site();
+        boolean started = false;
+        if (site.construction() == null) {
+            if (!startSite(ctx)) {
+                return false;
+            }
+            started = true;
+        }
+        ConstructionSite cs = site.construction();
+        var template = BlueprintPool.load(ctx.level(), BlueprintPool.Kind.of(cs.type()), cs.origin());
+        if (template.isEmpty()) {
+            site.setConstruction(null);
+            ctx.registry().markDirty();
+            return started;
+        }
+        walkToward(ctx, cs.origin());
+        int made = cs.advance(ctx.level(), template.get(), ctx.villager(), STEPS_PER_ACTION);
+        if (cs.done(template.get())) {
+            finish(ctx, cs, template.get());
+            return true;
+        }
+        if (made > 0 || started) {
+            ctx.registry().markDirty();
+        }
+        return made > 0 || started;
+    }
+
+    /** Prend le premier ordre, trouve son emplacement et retire les matériaux du stock. Faux si impossible pour l'instant. */
+    private boolean startSite(BehaviorContext ctx) {
+        var site = ctx.site();
+        BuildOrder order = site.orders().get(0);
+        BlockPos target = new BlockPos(order.x(), order.y(), order.z());
+        var template = BlueprintPool.load(ctx.level(), BlueprintPool.Kind.of(order.type()), target);
+        if (template.isEmpty()) {
+            return drop(ctx, order);
+        }
+        var stock = ctx.warehouse().read(site, ctx.level());
+        if (stock.getOrDefault(Resource.WOOD, 0) < order.wood() || stock.getOrDefault(Resource.STONE, 0) < order.stone()) {
+            return false;
+        }
+        var size = template.get().getSize();
+        Optional<BlockPos> spot = TerrainLeveler.findSpot(ctx.level(), site, order.x(), order.z(),
+                size.getX(), size.getY(), size.getZ(), SEARCH_RING, order.y(), ctx.villager());
+        if (spot.isEmpty()) {
+            return drop(ctx, order);
+        }
+        // le stock vient d'être vérifié : on retire les deux matériaux d'un coup
+        ctx.warehouse().withdraw(site, ctx.level(), Resource.WOOD, order.wood());
+        ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, order.stone());
+        site.setConstruction(new ConstructionSite(order.type(), spot.get(), 0));
+        ctx.registry().markDirty();
+        return true;
+    }
+
+    /** Ordre irréalisable (plan absent, aucun emplacement) : on l'abandonne, l'intendant en émettra un autre. */
+    private boolean drop(BehaviorContext ctx, BuildOrder order) {
+        ctx.site().orders().remove(order);
+        ctx.registry().markDirty();
+        return false;
+    }
+
+    private void finish(BehaviorContext ctx, ConstructionSite cs, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate t) {
+        var site = ctx.site();
+        site.orders().stream().filter(o -> o.type() == cs.type()).findFirst().ifPresent(site.orders()::remove);
+        site.built().merge(cs.type(), 1, Integer::sum);
+        site.state().setBeds(site.state().beds() + cs.countBeds(ctx.level(), t));
+        site.setConstruction(null);
+        ctx.registry().markDirty();
     }
 
     /** Tout village a un Hôtel de Ville : à défaut, le bâtisseur en pose un près du centre. */

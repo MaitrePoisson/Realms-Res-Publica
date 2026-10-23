@@ -273,6 +273,73 @@ public final class RrpGameTests {
                 h.getLevel().getRandom(), 2);
     }
 
+    @GameTest(template = ARENA, batch = "builders")
+    public static void builders(GameTestHelper h) {
+        try {
+            buildersBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void buildersBody(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        // a bump of earth and a hole: the leveler must cut and fill; a tree is cleared
+        h.setBlock(new BlockPos(6, 2, 6), Blocks.DIRT);
+        h.setBlock(new BlockPos(6, 3, 6), Blocks.DIRT);
+        h.setBlock(new BlockPos(7, 2, 6), Blocks.OAK_LOG);
+        h.setBlock(new BlockPos(7, 3, 6), Blocks.OAK_LEAVES);
+        h.setBlock(new BlockPos(9, 1, 6), Blocks.AIR);
+        BlockPos at = h.absolutePos(new BlockPos(8, 1, 6));
+        site.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.HOUSE, at.getX(), at.getY(), at.getZ()));
+        setAll(h, Role.BUILDER);
+        // no materials: the order waits
+        h.assertTrue(!act(h, site), "builder started without materials");
+        h.assertTrue(site.construction() == null && site.orders().size() == 1, "order kept while waiting");
+        BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        RrpMod.warehouse().refresh(site, level);
+        int woodBefore = site.state().stock(Resource.WOOD);
+        int beds = site.state().beds();
+        h.assertTrue(act(h, site), "builder did not start");
+        var cs = site.construction();
+        h.assertTrue(cs != null, "construction registered");
+        h.assertTrue(site.state().stock(Resource.WOOD) < woodBefore, "materials consumed from the store");
+        // it takes several actions, and a reload in the middle resumes the same site
+        h.assertTrue(site.construction() != null, "still under construction after the first action");
+        BlockPos origin = cs.origin();
+        h.assertTrue(site.contains(Worlds.name(level), origin.getX(), origin.getZ()), "inside the borders");
+        h.assertTrue(rrp.neoforge.RrpMod.persistence().flush(), "flush");
+        RrpMod.persistence().load();
+        VillageSite again = RrpMod.registry().all().stream().findFirst().orElseThrow();
+        h.assertTrue(again.construction() != null && again.construction().origin().equals(origin), "resumed after reload");
+        int guard = 0;
+        while (again.construction() != null && guard++ < 80) {
+            for (Villager v : RrpMod.adapter().present(again, level)) {
+                RrpMod.behaviors().runOnce(again, level, v);
+            }
+        }
+        h.assertTrue(again.construction() == null, "construction finished");
+        h.assertTrue(guard > 1, "construction took several actions");
+        h.assertTrue(again.orders().isEmpty(), "order completed");
+        h.assertTrue(again.built().getOrDefault(rrp.neoforge.urban.BuildType.HOUSE, 0) == 1, "built counter");
+        h.assertTrue(again.state().beds() > beds, "beds counted");
+        h.assertTrue(level.getBlockState(origin.offset(0, 1, 0)).is(Blocks.OAK_LOG), "house corner placed");
+        h.assertTrue(level.getBlockState(origin.offset(1, 1, 4)).getBlock() instanceof BedBlock, "bed placed");
+        h.assertTrue(level.getBlockState(origin.offset(-1, 1, -1)).isAir() || level.getBlockState(origin.offset(-1, 1, -1)).canBeReplaced(),
+                "margin cleared");
+        h.assertTrue(level.getBlockState(new BlockPos(hall.getX(), hall.getY(), hall.getZ())).is(Blocks.GOLD_BLOCK), "hall untouched");
+        for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+            var feet = level.getBlockState(v.blockPosition());
+            h.assertTrue(!feet.is(net.minecraft.tags.BlockTags.PLANKS) && !feet.is(net.minecraft.tags.BlockTags.LOGS), "villager walled in");
+        }
+        h.succeed();
+    }
+
     @GameTest(template = ARENA)
     public static void roles(GameTestHelper h) {
         village(h, 2, 2, 32);

@@ -3,6 +3,7 @@ package rrp.neoforge;
 import rrp.core.VillageState;
 import rrp.neoforge.urban.BuildOrder;
 import rrp.neoforge.urban.BuildType;
+import rrp.neoforge.urban.ConstructionSite;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -26,6 +27,8 @@ public final class VillageSite {
     private int[] hall;
     /** Ordres de construction en attente (émis par l'intendant), dans l'ordre. */
     private final List<BuildOrder> orders = new ArrayList<>();
+    /** Chantier en cours (un seul à la fois), ou {@code null}. */
+    private ConstructionSite construction;
     /** Nombre de bâtiments construits par type (hors huttes historiques). */
     private final Map<BuildType, Integer> built = new EnumMap<>(BuildType.class);
 
@@ -66,6 +69,8 @@ public final class VillageSite {
 
     public List<BuildOrder> orders() { return orders; }
     public Map<BuildType, Integer> built() { return built; }
+    public ConstructionSite construction() { return construction; }
+    public void setConstruction(ConstructionSite c) { this.construction = c; }
 
     public void clearHall() {
         this.hall = null;

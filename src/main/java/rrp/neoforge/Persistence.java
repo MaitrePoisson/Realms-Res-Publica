@@ -164,6 +164,15 @@ public final class Persistence {
             }
             o.add("orders", oa);
         }
+        if (s.construction() != null) {
+            JsonObject co = new JsonObject();
+            co.addProperty("type", s.construction().type().name());
+            co.addProperty("x", s.construction().origin().getX());
+            co.addProperty("y", s.construction().origin().getY());
+            co.addProperty("z", s.construction().origin().getZ());
+            co.addProperty("step", s.construction().step());
+            o.add("construction", co);
+        }
         if (!s.built().isEmpty()) {
             JsonObject bt = new JsonObject();
             s.built().forEach((t, n) -> bt.addProperty(t.name(), n));
@@ -232,6 +241,12 @@ public final class Persistence {
                 s.orders().add(new BuildOrder(BuildType.valueOf(bo.get("type").getAsString()), bo.get("x").getAsInt(),
                         bo.get("y").getAsInt(), bo.get("z").getAsInt(), bo.get("wood").getAsInt(), bo.get("stone").getAsInt()));
             }
+        }
+        if (o.has("construction")) {
+            JsonObject co = o.getAsJsonObject("construction");
+            s.setConstruction(new rrp.neoforge.urban.ConstructionSite(BuildType.valueOf(co.get("type").getAsString()),
+                    new net.minecraft.core.BlockPos(co.get("x").getAsInt(), co.get("y").getAsInt(), co.get("z").getAsInt()),
+                    co.get("step").getAsInt()));
         }
         if (o.has("built")) {
             for (var e : o.getAsJsonObject("built").entrySet()) {
