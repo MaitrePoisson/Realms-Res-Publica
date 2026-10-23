@@ -30,8 +30,8 @@ public final class SimConfig {
         MORALE_CROWDING_PENALTY(20, 0, 100),
         LOYALTY_SPEED_PER_S(0.2, 0.01, 10),
         LOYALTY_DIPLOMAT_BONUS(10, 0, 50),
-        LOYALTY_LOW_MORALE(40, 0, 100),
-        LOYALTY_LOW_MORALE_DECAY_PER_S(0.1, 0, 10),
+        LOYALTY_LOW_MORALE(55, 0, 100),
+        LOYALTY_LOW_MORALE_DECAY_PER_S(0.4, 0, 10),
         DISOBEY_MORALE(25, 0, 100),
         // Démographie
         BIRTH_INTERVAL_S(300, 1, 86400),

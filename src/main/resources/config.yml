@@ -34,9 +34,9 @@ loyalty_speed_per_s: 0.2
 # Bonus de loyauté cible quand le village compte un diplomate. [0 ; 50]
 loyalty_diplomat_bonus: 10
 # Sous ce moral, la loyauté baisse en plus de sa convergence. [0 ; 100]
-loyalty_low_morale: 40
+loyalty_low_morale: 55
 # Perte de loyauté supplémentaire (points/s) quand le moral est bas. [0 ; 10]
-loyalty_low_morale_decay_per_s: 0.1
+loyalty_low_morale_decay_per_s: 0.4
 # Sous ce moral, un villageois ne travaille plus (désobéissance). [0 ; 100]
 disobey_morale: 25
 
