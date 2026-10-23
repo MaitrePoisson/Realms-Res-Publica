@@ -36,7 +36,7 @@ run_phase "$LOG" "rrp help" "respublica reload" "rrp bogus" "rrp famine" "rrp vi
   "summon minecraft:villager ~1 ~ ~" "summon minecraft:villager ~-1 ~ ~" \
   "setblock ~2 ~ ~2 minecraft:red_bed[part=head,facing=east]" "setblock ~3 ~ ~3 minecraft:barrel" \
   "rrp village scan" "rrp village list" "rrp warehouse set" "execute as @e[type=minecraft:villager,limit=1] at @s run rrp setrole diplomate" "execute as @e[type=minecraft:villager] at @s run rrp inspect" "rrp status village-1" \
-  "setblock ~4 ~ ~4 minecraft:red_bed[part=head,facing=east]" "setblock ~5 ~ ~4 minecraft:red_bed[part=head,facing=east]"   "item replace block ~3 ~ ~3 container.0 with minecraft:bread 64" "rrp village scan" "rrp warehouse set" "rrp tick 6500"   "rrp status village-1" "rrp village flush"
+  "setblock ~4 ~ ~4 minecraft:red_bed[part=head,facing=east]" "setblock ~5 ~ ~4 minecraft:red_bed[part=head,facing=east]"   "item replace block ~3 ~ ~3 container.0 with minecraft:bread 64" "rrp village scan" "rrp warehouse set" "rrp tick 6500"   "rrp status village-1" "time set noon" "setblock ~6 ~-1 ~ minecraft:farmland" "setblock ~6 ~ ~ minecraft:wheat[age=7]" "execute as @e[type=minecraft:villager] at @s run rrp setrole farmer" "execute if block ~6 ~ ~ minecraft:wheat[age=7] run say WHEATOK" "rrp village act" "rrp village flush"
 if ! grep -q "Realms & Res Publica activé" "$LOG"; then
   echo "SERVER: mod not activated"; grep -n -E "ERROR|Exception|FATAL" "$LOG" | head -10; tail -n 15 "$LOG"; exit 1
 fi
@@ -44,7 +44,7 @@ if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG"; then echo "SERVER: mod er
 grep -q "Realms & Res Publica désactivé" "$LOG" || { echo "SERVER: no clean stop"; exit 1; }
 for pat in "Commandes disponibles" "config.yml relu" "Sous-commande inconnue" "pas encore disponible" "Aucun village connu" \
            "Scan des villages programmé" "village-1 (minecraft:overworld" "2 villageois, 1 lit" "Entrepôt de village-1 désigné" \
-           "Rôle changé : Diplomate" "Diplomate — satiété" "Villageois : 2, lits : 1" "villages.json écrit" "Naissance au village village-1" "Stock : Nourriture" "Villageois : 2, lits : 3"; do
+           "Rôle changé : Diplomate" "Diplomate — satiété" "Villageois : 2, lits : 1" "villages.json écrit" "Naissance au village village-1" "Stock : Nourriture" "Villageois : 2, lits : 3" "Actions de rôle forcées à village-1 : 1 villageois"; do
   grep -q "$pat" "$LOG" || { echo "SERVER: phase 1 reply missing: $pat"; exit 1; }
 done
 # gauges must have moved after the accelerated ticks (first vs last status line)
@@ -54,7 +54,7 @@ done
 run_phase "$LOG2" "rrp village list" "execute as @e[type=minecraft:villager] at @s run rrp inspect" "rrp village scan" "rrp status village-1"   "setblock ~5 ~ ~5 minecraft:red_bed[part=head,facing=east]" "setblock ~5 ~ ~7 minecraft:red_bed[part=head,facing=east]" "setblock ~5 ~ ~9 minecraft:red_bed[part=head,facing=east]"   "item replace block ~3 ~ ~3 container.0 with minecraft:bread 64" "rrp village scan" "rrp status village-1" "rrp tick 12000" "rrp status village-1" "rrp village scan" "rrp status village-1"
 grep -q "1 village(s) rechargé(s)" "$LOG2" || { echo "SERVER: phase 2 did not reload the village"; tail -n 15 "$LOG2"; exit 1; }
 if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG2"; then echo "SERVER: mod error in log (phase 2)"; exit 1; fi
-for pat in "village-1 (minecraft:overworld" "Diplomate — satiété" "Villageois : 2, lits : 3"; do
+for pat in "village-1 (minecraft:overworld" "Fermier — satiété" "Villageois : 2, lits : 3"; do
   grep -q "$pat" "$LOG2" || { echo "SERVER: phase 2 reply missing: $pat"; exit 1; }
 done
 grep -q "Naissance au village" "$LOG2" || { echo "SERVER: no birth after 12000 ticks with food and free beds"; exit 1; }

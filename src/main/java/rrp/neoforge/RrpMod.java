@@ -38,6 +38,7 @@ public final class RrpMod {
     private static GaugeTicker gauges;
     private static BirthService births;
     private static ActionBarService actionBar;
+    private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
     private static Persistence persistence;
 
     public RrpMod(IEventBus modBus) {
@@ -55,6 +56,7 @@ public final class RrpMod {
     public static GaugeTicker gauges() { return gauges; }
     public static BirthService births() { return births; }
     public static ActionBarService actionBar() { return actionBar; }
+    public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
     public static Persistence persistence() { return persistence; }
 
     public static SimConfig simConfig() {
@@ -80,6 +82,7 @@ public final class RrpMod {
         gauges = new GaugeTicker(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         births = new BirthService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
         actionBar = new ActionBarService(RrpMod::simConfig, RrpMod::server, REGISTRY, RrpMod::lang);
+        behaviors = new rrp.neoforge.behaviors.BehaviorScheduler(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         persistence = new Persistence(REGISTRY, server.getWorldPath(LevelResource.ROOT).resolve(MOD_ID), LOG);
         int loaded = persistence.load();
         TICKS.register(worldTimer);
@@ -92,6 +95,7 @@ public final class RrpMod {
         gauges.onTicks(t);
         actionBar.onTicks(t);
         births.onTicks(t);
+        behaviors.onTicks(t);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };
 

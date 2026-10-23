@@ -70,6 +70,22 @@ final class VillageCommands {
                 RrpMod.adapter().saveAll();
                 Commands.reply(src, lang.msg(RrpMod.persistence().flush() ? "village.flushed" : "village.flush_failed"));
             }
+            case "act" -> {
+                ServerLevel level = src.getLevel();
+                Vec3 pos = src.getPosition();
+                VillageSite site = RrpMod.registry().find(Worlds.name(level), pos.x, pos.z);
+                if (site == null) {
+                    Commands.reply(src, lang.msg("warehouse.no_village"));
+                    return;
+                }
+                int done = 0;
+                for (Villager v : RrpMod.adapter().present(site, level)) {
+                    if (RrpMod.behaviors().runOnce(site, level, v)) {
+                        done++;
+                    }
+                }
+                Commands.reply(src, lang.msg("village.acted", site.id(), done));
+            }
             default -> Commands.reply(src, lang.msg("error.usage_village"));
         }
     }
