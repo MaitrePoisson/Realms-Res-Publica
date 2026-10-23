@@ -195,6 +195,23 @@ public final class Persistence {
             }
             o.add("roads", ra);
         }
+        if (s.defense().started() || !s.defense().towers().isEmpty()) {
+            var d = s.defense();
+            JsonObject dj = new JsonObject();
+            dj.addProperty("stage", d.stage());
+            dj.addProperty("radius", d.radius());
+            dj.addProperty("laid", d.laid());
+            dj.addProperty("upgraded", d.upgraded());
+            dj.addProperty("issued", d.towersIssued());
+            JsonArray ta = new JsonArray();
+            for (int[] t : d.towers()) {
+                ta.add(t[0]);
+                ta.add(t[1]);
+                ta.add(t[2]);
+            }
+            dj.add("towers", ta);
+            o.add("defense", dj);
+        }
         if (!s.built().isEmpty()) {
             JsonObject bt = new JsonObject();
             s.built().forEach((t, n) -> bt.addProperty(t.name(), n));
@@ -284,6 +301,16 @@ public final class Persistence {
                 s.roads().add(new rrp.neoforge.urban.RoadNetwork.Road(ro.get("fx").getAsInt(), ro.get("fz").getAsInt(),
                         ro.get("tx").getAsInt(), ro.get("tz").getAsInt(), ro.get("wide").getAsBoolean(), path,
                         ro.get("laid").getAsInt(), ro.get("paved").getAsInt()));
+            }
+        }
+        if (o.has("defense")) {
+            JsonObject dj = o.getAsJsonObject("defense");
+            var d = s.defense();
+            d.restore(dj.get("stage").getAsInt(), dj.get("radius").getAsInt(), dj.get("laid").getAsInt(),
+                    dj.get("upgraded").getAsInt(), dj.get("issued").getAsInt());
+            JsonArray ta = dj.getAsJsonArray("towers");
+            for (int i = 0; i + 2 < ta.size(); i += 3) {
+                d.towers().add(new int[] {ta.get(i).getAsInt(), ta.get(i + 1).getAsInt(), ta.get(i + 2).getAsInt()});
             }
         }
         if (o.has("built")) {

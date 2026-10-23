@@ -16,6 +16,8 @@ import rrp.neoforge.Worlds;
 import rrp.neoforge.urban.BlueprintPool;
 import rrp.neoforge.urban.BuildOrder;
 import rrp.neoforge.urban.ConstructionSite;
+import rrp.neoforge.urban.DefensePlan;
+import rrp.neoforge.urban.DefensePlanner;
 import rrp.neoforge.urban.RoadNetwork;
 import rrp.neoforge.urban.TerrainLeveler;
 
@@ -53,6 +55,9 @@ public final class Builder extends RoleBehavior {
         }
         if (ctx.site().hasWarehouse() && (ctx.site().construction() != null || !ctx.site().orders().isEmpty())
                 && construct(ctx)) {
+            return true;
+        }
+        if (ctx.site().hasWarehouse() && ctx.site().construction() == null && workOnDefense(ctx)) {
             return true;
         }
         if (ctx.site().hasWarehouse() && ctx.site().construction() == null && workOnRoads(ctx)) {
@@ -152,6 +157,11 @@ public final class Builder extends RoleBehavior {
         site.built().merge(cs.type(), 1, Integer::sum);
         site.state().setBeds(site.state().beds() + cs.countBeds(ctx.level(), t));
         site.setConstruction(null);
+        if (cs.type() == rrp.neoforge.urban.BuildType.TOWER) {
+            var size = t.getSize();
+            site.defense().towers().add(new int[] {cs.origin().getX() + size.getX() / 2,
+                    cs.origin().getY() + size.getY() - 1, cs.origin().getZ() + size.getZ() / 2});
+        }
         addRoad(ctx, cs.origin().getX() + t.getSize().getX() / 2, cs.origin().getZ() + t.getSize().getZ() / 2, true);
         ctx.registry().markDirty();
     }
@@ -211,6 +221,71 @@ public final class Builder extends RoleBehavior {
                 ctx.registry().markDirty();
                 return true;
             }
+        }
+        return false;
+    }
+
+    private static DefensePlan.Rules defenseRules(BehaviorContext ctx) {
+        var c = ctx.config();
+        return new DefensePlan.Rules((int) c.get(SimConfig.Key.DEFENSE_POPULATION), (int) c.get(SimConfig.Key.DEFENSE_THREATS),
+                (int) c.get(SimConfig.Key.DEFENSE_RING_RADIUS), (int) c.get(SimConfig.Key.DEFENSE_STONE_STOCK),
+                (int) c.get(SimConfig.Key.DEFENSE_STONE_POPULATION));
+    }
+
+    /**
+     * Fortifie le village : déclenche l'enceinte (population ou menaces), commande les tours aux angles, pose la palissade
+     * de bois puis la remplace par des murs de pierre, avec une porte à chaque croisement de route. Vrai si quelque chose a été fait.
+     */
+    private boolean workOnDefense(BehaviorContext ctx) {
+        var site = ctx.site();
+        var d = site.defense();
+        var rules = defenseRules(ctx);
+        if (!d.started()) {
+            if (!DefensePlan.shouldStart(site.state().population(), site.state().threats(), rules)) {
+                return false;
+            }
+            d.start(Math.min(rules.ringRadius(), Math.max(4, site.radius() - 2)));
+            ctx.registry().markDirty();
+        }
+        int[] hall = site.hall();
+        if (d.towersIssued() < DefensePlan.towerTarget(site.state().population())
+                && site.orders().size() < (int) ctx.config().get(SimConfig.Key.MAX_BUILD_ORDERS)) {
+            int[] at = DefensePlan.towerSite(hall[0], hall[2], d.radius(), d.towersIssued());
+            site.orders().add(BuildOrder.of(rrp.neoforge.urban.BuildType.TOWER, at[0], hall[1], at[1]));
+            d.towerIssued();
+            ctx.registry().markDirty();
+            return false;
+        }
+        java.util.List<int[]> paths = new java.util.ArrayList<>();
+        site.roads().stream().filter(RoadNetwork.Road::hasPath).forEach(r -> paths.add(r.path()));
+        if (!d.palisadeDone()) {
+            int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.laid());
+            int cost = (n + 2) / 3;
+            if (ctx.warehouse().withdraw(site, ctx.level(), Resource.WOOD, cost) < cost) {
+                return false;
+            }
+            int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.laid());
+            walkToward(ctx, new BlockPos(c[0], hall[1], c[1]));
+            d.advanceLaid(DefensePlanner.work(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.laid(), n, false));
+            ctx.registry().markDirty();
+            return true;
+        }
+        int stone = ctx.warehouse().read(site, ctx.level()).getOrDefault(Resource.STONE, 0);
+        if (DefensePlan.shouldUpgrade(d, stone, site.state().population(), rules)) {
+            d.startUpgrade();
+            ctx.registry().markDirty();
+        }
+        if (d.stage() == rrp.neoforge.urban.Defense.STONE && !d.stoneDone()) {
+            int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.upgraded());
+            int cost = (n + 1) / 2;
+            if (ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, cost) < cost) {
+                return false;
+            }
+            int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.upgraded());
+            walkToward(ctx, new BlockPos(c[0], hall[1], c[1]));
+            d.advanceUpgraded(DefensePlanner.work(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.upgraded(), n, true));
+            ctx.registry().markDirty();
+            return true;
         }
         return false;
     }

@@ -32,6 +32,8 @@ public final class VillageSite {
     private ConstructionSite construction;
     /** Routes du village (tracé, posées puis pavées), dans l'ordre de commande. */
     private final List<RoadNetwork.Road> roads = new ArrayList<>();
+    /** Enceinte et tours de guet. */
+    private final rrp.neoforge.urban.Defense defense = new rrp.neoforge.urban.Defense();
     /** Nombre de bâtiments construits par type (hors huttes historiques). */
     private final Map<BuildType, Integer> built = new EnumMap<>(BuildType.class);
 
@@ -73,6 +75,7 @@ public final class VillageSite {
     public List<BuildOrder> orders() { return orders; }
     public List<RoadNetwork.Road> roads() { return roads; }
     public Map<BuildType, Integer> built() { return built; }
+    public rrp.neoforge.urban.Defense defense() { return defense; }
     public ConstructionSite construction() { return construction; }
     public void setConstruction(ConstructionSite c) { this.construction = c; }
 

@@ -15,6 +15,17 @@ public final class Guard extends RoleBehavior {
     /** Dégâts d'une frappe de garde : de quoi abattre un monstre courant d'un coup. */
     static final float STRIKE_DAMAGE = 20;
 
+    /** Portée d'une frappe supplémentaire, en blocs, d'un garde posté sur une tour. */
+    static final int TOWER_BONUS = 8;
+    /** Distance (blocs) à la tour en deçà de laquelle le garde est considéré comme posté. */
+    static final int TOWER_REACH = 6;
+
+    /** Tour de guet de ce garde (répartition stable par identifiant), ou {@code null} si le village n'en a pas. */
+    static int[] tower(BehaviorContext ctx) {
+        var towers = ctx.site().defense().towers();
+        return towers.isEmpty() ? null : towers.get(Math.floorMod(ctx.villager().getUUID().hashCode(), towers.size()));
+    }
+
     @Override
     public Role role() {
         return Role.GUARD;
@@ -23,6 +34,10 @@ public final class Guard extends RoleBehavior {
     @Override
     public boolean runOnce(BehaviorContext ctx) {
         int r = ctx.workRadius();
+        int[] post = tower(ctx);
+        if (post != null && ctx.villager().distanceToSqr(post[0] + 0.5, post[1], post[2] + 0.5) <= TOWER_REACH * TOWER_REACH) {
+            r += TOWER_BONUS;
+        }
         AABB box = ctx.villager().getBoundingBox().inflate(r, 16, r);
         String world = Worlds.name(ctx.level());
         Optional<Mob> target = ctx.level().getEntitiesOfClass(Mob.class, box, e -> e instanceof Enemy && e.isAlive())
@@ -30,6 +45,11 @@ public final class Guard extends RoleBehavior {
                 .filter(e -> ctx.site().contains(world, e.getX(), e.getZ()))
                 .min(Comparator.comparingDouble(e -> e.distanceToSqr(ctx.villager())));
         if (target.isEmpty()) {
+            if (post != null && !ctx.villager().isNoAi()
+                    && ctx.villager().distanceToSqr(post[0] + 0.5, post[1], post[2] + 0.5) > 4) {
+                ctx.villager().getNavigation().moveTo(post[0] + 0.5, post[1], post[2] + 0.5, 0.5);
+                return true;
+            }
             return false;
         }
         Mob monster = target.get();

@@ -233,6 +233,8 @@ final class VillageCommands {
         if (site.hasHall()) {
             Commands.reply(src, lang.msg("status.orders", site.orders().isEmpty() ? "aucun" : site.orders().stream()
                     .map(b -> b.type() + "@" + b.x() + "," + b.z()).collect(java.util.stream.Collectors.joining(" "))));
+            var def = site.defense();
+            Commands.reply(src, lang.msg("status.defense", def.stage(), def.laid(), def.upgraded(), def.length(), def.towers().size()));
             Commands.reply(src, lang.msg("status.chests", RrpMod.warehouse().communityChests(site, Worlds.level(RrpMod.server(), site.worldName()))));
         }
     }

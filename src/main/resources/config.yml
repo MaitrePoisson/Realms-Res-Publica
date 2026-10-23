@@ -125,6 +125,16 @@ road_pave_stone_stock: 60
 road_pave_population: 8
 # Distance maximale (blocs) a laquelle une route relie l'Hotel de Ville a un autre village ou campement. 0 = jamais. [0 ; 1000]
 road_link_distance: 160
+# Population a partir de laquelle le village se fortifie (palissade + tours de guet). [0 ; 1000]
+defense_population: 12
+# Menaces simultanees a partir desquelles le village se fortifie, meme petit. [0 ; 1000]
+defense_threats: 3
+# Rayon (blocs) de l'enceinte autour de l'Hotel de Ville. [4 ; 60]
+defense_ring_radius: 30
+# Stock de pierre a partir duquel la palissade de bois est remplacee par des murs de pierre. [0 ; 100000]
+defense_stone_stock: 80
+# Population minimale avant de remplacer la palissade par des murs de pierre. [0 ; 1000]
+defense_stone_population: 14
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

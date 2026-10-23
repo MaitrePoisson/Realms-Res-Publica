@@ -340,6 +340,89 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "defense")
+    public static void defense(GameTestHelper h) {
+        try {
+            defenseBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void defenseBody(GameTestHelper h) {
+        for (int x = 0; x < 24; x++) {
+            for (int z = 0; z < 24; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.GRASS_BLOCK);
+                for (int y = 2; y < 12; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        VillageSite site = village(h, 14, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(12, 2, 12));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        // a finished road leaving the hall to the north: the ring must open a gate where it crosses
+        int[] path = new int[2 * 12];
+        for (int i = 0; i < 12; i++) {
+            path[2 * i] = hall.getX();
+            path[2 * i + 1] = hall.getZ() - i;
+        }
+        site.roads().add(new rrp.neoforge.urban.RoadNetwork.Road(hall.getX(), hall.getZ(), hall.getX(), hall.getZ() - 11, false, path, 12, 12));
+        BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.OAK_PLANKS, 64));
+        barrel.setItem(1, new ItemStack(Items.COBBLESTONE, 64));
+        barrel.setItem(2, new ItemStack(Items.COBBLESTONE, 64));
+        RrpMod.warehouse().refresh(site, level);
+        setAll(h, Role.BUILDER);
+        var d = site.defense();
+        h.assertTrue(site.state().population() >= 14 && !d.started(), "setup: population " + site.state().population());
+        // trigger by population: the first guard tower is ordered on the borders
+        RrpMod.behaviors().runOnce(site, level, RrpMod.adapter().present(site, level).get(0));
+        h.assertTrue(d.started() && d.towersIssued() == 1 && site.orders().size() == 1
+                && site.orders().get(0).type() == rrp.neoforge.urban.BuildType.TOWER, "first tower not ordered");
+        site.orders().clear();
+        d.restore(rrp.neoforge.urban.Defense.PALISADE, 9, 0, 0, 99);
+        int guard = 0;
+        var builder = RrpMod.adapter().present(site, level).get(0);
+        while (!d.palisadeDone() && guard++ < 60) {
+            RrpMod.behaviors().runOnce(site, level, builder);
+        }
+        h.assertTrue(d.palisadeDone(), "palisade not finished");
+        int cx = hall.getX();
+        int cz = hall.getZ();
+        int gates = 0;
+        for (int i = 0; i < d.length(); i++) {
+            int[] c = rrp.neoforge.urban.DefensePlan.ringAt(cx, cz, 9, i);
+            h.assertTrue(rrp.neoforge.urban.DefensePlanner.closed(level, c[0], c[1], hall.getY()), "palisade hole at ring " + i);
+            var b = level.getBlockState(new BlockPos(c[0], hall.getY(), c[1]));
+            if (b.is(Blocks.OAK_FENCE_GATE)) {
+                gates++;
+            } else {
+                h.assertTrue(b.is(Blocks.OAK_FENCE), "palisade block at ring " + i);
+            }
+        }
+        h.assertTrue(gates >= 1 && level.getBlockState(new BlockPos(cx, hall.getY(), cz - 9)).is(Blocks.OAK_FENCE_GATE), "gate at the road crossing");
+        // upgrade to stone once the stone stock and the population allow it
+        guard = 0;
+        while (!d.stoneDone() && guard++ < 80) {
+            act(h, site);
+        }
+        h.assertTrue(d.stage() == rrp.neoforge.urban.Defense.STONE && d.stoneDone(), "stone upgrade not finished");
+        for (int i = 0; i < d.length(); i++) {
+            int[] c = rrp.neoforge.urban.DefensePlan.ringAt(cx, cz, 9, i);
+            var b = level.getBlockState(new BlockPos(c[0], hall.getY(), c[1]));
+            h.assertTrue(b.is(Blocks.STONE_BRICK_WALL) || b.is(Blocks.OAK_FENCE_GATE), "stone wall at ring " + i);
+        }
+        h.assertTrue(rrp.neoforge.RrpMod.persistence().flush(), "flush");
+        RrpMod.persistence().load();
+        VillageSite again = RrpMod.registry().all().stream().findFirst().orElseThrow();
+        h.assertTrue(again.defense().stage() == rrp.neoforge.urban.Defense.STONE && again.defense().radius() == 9
+                && again.defense().upgraded() == d.length(), "defense persisted");
+        h.succeed();
+    }
+
     @GameTest(template = ARENA, batch = "roads")
     public static void roads(GameTestHelper h) {
         try {
