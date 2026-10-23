@@ -18,12 +18,15 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.state.properties.BedPart;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec2;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import rrp.core.Role;
 import rrp.core.SimEvent;
+import rrp.core.Resource;
 import rrp.neoforge.TownHall;
+import rrp.neoforge.WarehouseService;
 import rrp.neoforge.Worlds;
 import rrp.neoforge.RrpMod;
 import rrp.neoforge.VillageSite;
@@ -111,6 +114,17 @@ public final class RrpGameTests {
         return site;
     }
 
+    /** Retire halls, lecterns and chests de l'arène : les arènes voisines partagent le monde et le scanner les verrait. */
+    private static void wipeTown(GameTestHelper h) {
+        AABB b = h.getBounds();
+        for (BlockPos p : BlockPos.betweenClosed(BlockPos.containing(b.minX, b.minY, b.minZ), BlockPos.containing(b.maxX, b.maxY, b.maxZ))) {
+            var st = h.getLevel().getBlockState(p);
+            if (st.is(Blocks.LECTERN) || st.is(Blocks.GOLD_BLOCK) || st.is(Blocks.CHEST)) {
+                h.getLevel().setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+    }
+
     private static void setAll(GameTestHelper h, Role role) {
         for (Villager v : h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds())) {
             RrpMod.adapter().setRole(v, role);
@@ -156,8 +170,16 @@ public final class RrpGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
+    @GameTest(template = ARENA, batch = "townHall")
     public static void townHall(GameTestHelper h) {
+        try {
+            townHallBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void townHallBody(GameTestHelper h) {
         VillageSite site = village(h, 2, 2, 32);
         h.assertTrue(!site.hasHall(), "no hall yet");
         h.assertTrue(cmd(h, "rrp townhall info").contains("pas encore"), "info without hall");
@@ -177,6 +199,49 @@ public final class RrpGameTests {
         h.assertTrue(act(h, site), "builder did nothing");
         h.assertTrue(site.hasHall(), "builder rebuilt the hall");
         h.assertTrue(site.inCore(Worlds.name(h.getLevel()), site.hall()[0], site.hall()[2], 12), "core contains hall");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA, batch = "communityStore")
+    public static void communityStore(GameTestHelper h) {
+        try {
+            communityStoreBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void communityStoreBody(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(18, 2, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        BlockPos chestPos = hall.offset(2, 0, 0);
+        level.setBlock(chestPos, Blocks.CHEST.defaultBlockState(), 3);
+        // fill the barrel warehouse so that further items must go to the chest
+        BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
+        for (int i = 0; i < barrel.getContainerSize(); i++) {
+            barrel.setItem(i, new ItemStack(Items.COBBLESTONE, 64));
+        }
+        ItemStack left = RrpMod.warehouse().deposit(site, level, new ItemStack(Items.OAK_LOG, 10));
+        h.assertTrue(left.isEmpty(), "wood went into the community chest");
+        h.assertTrue(level.getBlockEntity(chestPos) instanceof Container c && c.countItem(Items.OAK_LOG) == 10, "chest holds the logs");
+        h.assertTrue(site.state().stock(Resource.WOOD) == 10, "wood stock " + site.state().stock(Resource.WOOD));
+        h.assertTrue(site.state().stock(Resource.STONE) > 0, "stone counted from the barrel");
+        // withdraw crosses containers
+        h.assertTrue(RrpMod.warehouse().withdraw(site, level, Resource.WOOD, 4) == 4, "withdraw wood");
+        h.assertTrue(site.state().stock(Resource.WOOD) == 6, "wood after withdraw");
+        // a full store makes the collectors add a new chest
+        Container chest = (Container) level.getBlockEntity(chestPos);
+        for (int i = 0; i < chest.getContainerSize(); i++) {
+            chest.setItem(i, new ItemStack(Items.COBBLESTONE, 64));
+        }
+        int before = RrpMod.warehouse().communityChests(site, level);
+        ItemStack more = RrpMod.warehouse().deposit(site, level, new ItemStack(Items.IRON_INGOT, 5));
+        h.assertTrue(more.isEmpty(), "ore stored after auto chest");
+        h.assertTrue(RrpMod.warehouse().communityChests(site, level) == before + 1, "a new chest was placed");
+        h.assertTrue(cmd(h, "rrp status " + site.id()).contains("Coffres communautaires"), "status shows chests");
         h.succeed();
     }
 

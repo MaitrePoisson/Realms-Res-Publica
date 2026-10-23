@@ -257,6 +257,7 @@ public final class VillageScanner {
                     s.clearHall(); // détruit : le bâtisseur en refera un
                 }
                 if (w != null) {
+                    warehouse.ensureForHall(s, w);
                     warehouse.refresh(s, w);
                     adapter.sync(s, w);
                 }

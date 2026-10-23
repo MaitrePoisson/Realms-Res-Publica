@@ -66,6 +66,7 @@ public final class Builder extends RoleBehavior {
         walkToward(ctx, base);
         TownHall.build(ctx.level(), base);
         ctx.site().setHall(base.getX(), base.getY(), base.getZ());
+        ctx.warehouse().ensureForHall(ctx.site(), ctx.level());
         ctx.registry().markDirty();
         return true;
     }

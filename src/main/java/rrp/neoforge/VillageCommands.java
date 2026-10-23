@@ -170,6 +170,7 @@ final class VillageCommands {
                     return;
                 }
                 site.setHall(base.getX(), base.getY(), base.getZ());
+                RrpMod.warehouse().ensureForHall(site, level);
                 RrpMod.registry().markDirty();
                 Commands.reply(src, lang.msg("townhall.set", site.id(), base.getX(), base.getY(), base.getZ()));
             }
@@ -181,6 +182,7 @@ final class VillageCommands {
                 }
                 TownHall.build(level, base);
                 site.setHall(base.getX(), base.getY(), base.getZ());
+                RrpMod.warehouse().ensureForHall(site, level);
                 RrpMod.registry().markDirty();
                 Commands.reply(src, lang.msg("townhall.built", site.id(), base.getX(), base.getY(), base.getZ()));
             }
@@ -228,6 +230,9 @@ final class VillageCommands {
             stock.append(r.label()).append(' ').append(st.stock(r)).append("  ");
         }
         Commands.reply(src, lang.get("status.stock", site.hasWarehouse() ? stock.toString().trim() : lang.get("status.no_warehouse")));
+        if (site.hasHall()) {
+            Commands.reply(src, lang.msg("status.chests", RrpMod.warehouse().communityChests(site, Worlds.level(RrpMod.server(), site.worldName()))));
+        }
     }
 
     /** Villageois désigné : UUID donné en argument, sinon celui que vise le joueur, sinon le plus proche (6 blocs). */

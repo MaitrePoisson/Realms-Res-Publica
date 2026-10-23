@@ -107,6 +107,10 @@ relations_per_visit: 5
 hut_wood: 30
 # Rayon (blocs) du cœur du village autour de l'Hôtel de Ville. [4 ; 64]
 town_hall_radius: 12
+# Rayon (blocs) autour de l'Hôtel de Ville où coffres et tonneaux forment le stock communautaire. [2 ; 16]
+store_radius: 5
+# Nombre maximal de coffres que les collecteurs ajoutent d'eux-mêmes quand le stock est plein. [1 ; 30]
+max_chests: 6
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
