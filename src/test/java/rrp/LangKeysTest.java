@@ -20,8 +20,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class LangKeysTest {
 
     private static final Path SRC = Path.of("src/main/java/rrp/neoforge");
-    // Transitoire (portage NeoForge) : le code Paper de reference est aussi controle tant qu'il existe.
-    private static final Path LEGACY = Path.of("legacy-paper/java/rrp/bukkit");
     private static final Pattern KEY = Pattern.compile("\"((?:[a-z_]+\\.)+[a-z_]+)\"");
     private static final Pattern LANG_CALL = Pattern.compile("\\blang\\s*\\.\\s*(?:get|msg)\\s*\\(");
     private static final Pattern YAML_KEY = Pattern.compile("^\"?([A-Za-z0-9_.]+)\"?\\s*:", Pattern.MULTILINE);
@@ -44,7 +42,7 @@ class LangKeysTest {
         Set<String> have = langKeys();
         Set<String> missing = new TreeSet<>();
         int seen = 0;
-        List<Path> roots = Files.exists(LEGACY) ? List.of(SRC, LEGACY) : List.of(SRC);
+        List<Path> roots = List.of(SRC);
         for (Path root : roots) {
           try (Stream<Path> files = Files.walk(root)) {
             for (Path f : (Iterable<Path>) files.filter(x -> x.toString().endsWith(".java"))::iterator) {
