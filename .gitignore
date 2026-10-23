@@ -1,0 +1,7 @@
+# Local secrets (added by Athanor)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.dist
