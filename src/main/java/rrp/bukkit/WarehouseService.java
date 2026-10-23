@@ -37,7 +37,7 @@ public final class WarehouseService {
         if (m == null || m.isAir()) {
             return null;
         }
-        if (m.isEdible() && !NOT_FOOD.contains(m)) {
+        if (m == Material.WHEAT || (m.isEdible() && !NOT_FOOD.contains(m))) {
             return Resource.FOOD;
         }
         if (Tag.LOGS.isTagged(m) || Tag.PLANKS.isTagged(m)) {

@@ -35,7 +35,7 @@ final class RoleCases {
     }
 
     /** Village de {@code n} villageois sans IA autour de (x, z), avec un lit. */
-    private static VillageSite villageOf(TestWorld w, RrpPlugin p, int x, int z, int n, List<Villager> out) {
+    static VillageSite villageOf(TestWorld w, RrpPlugin p, int x, int z, int n, List<Villager> out) {
         Location g = w.ground(x, z);
         VillageSite s = p.registry().create(g, 64);
         w.placeBed(g.clone().add(2, 0, 0), org.bukkit.block.BlockFace.SOUTH);
