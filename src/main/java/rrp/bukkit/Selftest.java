@@ -41,6 +41,7 @@ public final class Selftest {
     public int runAll(CommandSender out) {
         out.sendMessage(lang.msg("selftest.start", cases.size()));
         List<Outcome> results = new ArrayList<>();
+        plugin.visuals().reset();
         for (SelftestCase c : cases) {
             TestWorld world = new TestWorld(plugin, ticks);
             long t0 = System.nanoTime();
@@ -72,6 +73,12 @@ public final class Selftest {
         } catch (IOException e) {
             plugin.getLogger().severe("selftest : écriture de " + file + " impossible : " + e.getMessage());
             failed++;
+        }
+        try {
+            Files.writeString(new File(plugin.getDataFolder(), VisualExport.FILE).toPath(),
+                    plugin.visuals().html(passed, failed), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            plugin.getLogger().warning("selftest : écriture de " + VisualExport.FILE + " impossible : " + e.getMessage());
         }
         out.sendMessage(lang.msg("selftest.done", passed, failed, file.getName()));
         plugin.getLogger().info("selftest terminé : " + passed + " réussi(s), " + failed + " échoué(s)");

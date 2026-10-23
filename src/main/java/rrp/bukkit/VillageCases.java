@@ -43,10 +43,19 @@ final class VillageCases {
                 try {
                     body.run(w, p);
                 } finally {
-                    for (VillageSite s : new ArrayList<>(p.registry().all())) {
+                    List<VillageSite> created = new ArrayList<>();
+                    for (VillageSite s : p.registry().all()) {
                         if (!before.contains(s.id())) {
-                            p.registry().remove(s.id());
+                            created.add(s);
                         }
+                    }
+                    try {
+                        p.visuals().capture(name, created);
+                    } catch (RuntimeException e) {
+                        p.getLogger().warning("visuels : « " + name + " » non photographié : " + e);
+                    }
+                    for (VillageSite s : created) {
+                        p.registry().remove(s.id());
                     }
                 }
             }

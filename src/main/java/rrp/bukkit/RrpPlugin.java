@@ -11,6 +11,7 @@ public final class RrpPlugin extends JavaPlugin {
     private final TickService ticks = new TickService();
     private final VillageRegistry registry = new VillageRegistry();
     private final WarehouseService warehouse = new WarehouseService(registry);
+    private final VisualExport visuals = new VisualExport();
     private SimConfig simConfig = SimConfig.defaults();
     private VillageScanner scanner;
     private VillagerAdapter adapter;
@@ -99,6 +100,10 @@ public final class RrpPlugin extends JavaPlugin {
 
     public Selftest selftest() {
         return selftest;
+    }
+
+    public VisualExport visuals() {
+        return visuals;
     }
 
     public VillageRegistry registry() {

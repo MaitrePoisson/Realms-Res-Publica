@@ -10,7 +10,7 @@ bash "$ROOT/tools/fetch_paper.sh" >/dev/null || { echo "téléchargement de Pape
 mkdir -p "$SRV/plugins" "$ROOT/.athanor/.verif"
 cp "$JAR" "$SRV/plugins/RealmsResPublica.jar"
 RESULT="$SRV/plugins/RealmsResPublica/selftest-result.json"
-rm -f "$RESULT" "$SRV/plugins/RealmsResPublica/villages.json"
+rm -f "$RESULT" "$SRV/plugins/RealmsResPublica/selftest-visuels.html" "$SRV/plugins/RealmsResPublica/villages.json"
 LOG="$ROOT/.athanor/.verif/server.log"
 : > "$LOG"
 cd "$SRV" || exit 1
@@ -44,6 +44,7 @@ if [ ! -s "$SRV/plugins/RealmsResPublica/villages.json" ]; then
   echo "PERSISTANCE: villages.json absent après l'arrêt"; exit 1
 fi
 cp "$RESULT" "$ROOT/.athanor/.verif/selftest-result.json"
+bash "$ROOT/tools/render_visuels.sh" "$SRV/plugins/RealmsResPublica/selftest-visuels.html" || echo "VISUELS: génération échouée (non bloquant)"
 SUMMARY=$(tr -d "[:space:]" < "$RESULT" | grep -o '"total":[0-9]*,"passed":[0-9]*,"failed":[0-9]*')
 echo "SELFTEST: $SUMMARY"
 if ! echo "$SUMMARY" | grep -q '"failed":0$' || echo "$SUMMARY" | grep -q '"total":0,'; then
