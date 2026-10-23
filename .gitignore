@@ -5,3 +5,7 @@
 !.env.sample
 !.env.template
 !.env.dist
+
+# Build
+build/
+.gradle/

@@ -1,0 +1,6 @@
+name: RealmsResPublica
+version: '${version}'
+main: rrp.bukkit.RrpPlugin
+api-version: '1.20'
+description: Société des villageois - rôles, besoins, démographie et crises.
+authors: [Realms & Res Publica]
