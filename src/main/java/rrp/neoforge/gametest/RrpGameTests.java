@@ -30,6 +30,8 @@ import rrp.neoforge.WarehouseService;
 import rrp.neoforge.Worlds;
 import rrp.neoforge.RrpMod;
 import rrp.neoforge.VillageSite;
+import rrp.neoforge.urban.BiomeStyle;
+import rrp.neoforge.urban.BlueprintPool;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -243,6 +245,32 @@ public final class RrpGameTests {
         h.assertTrue(RrpMod.warehouse().communityChests(site, level) == before + 1, "a new chest was placed");
         h.assertTrue(cmd(h, "rrp status " + site.id()).contains("Coffres communautaires"), "status shows chests");
         h.succeed();
+    }
+
+    @GameTest(template = ARENA, batch = "blueprints")
+    public static void blueprints(GameTestHelper h) {
+        for (BlueprintPool.Kind k : BlueprintPool.Kind.values()) {
+            for (BiomeStyle s : BiomeStyle.values()) {
+                var t = BlueprintPool.load(h.getLevel(), k, s);
+                if (t.isEmpty()) { h.fail("blueprint missing: " + BlueprintPool.id(k, s)); return; }
+                if (t.get().getSize().getX() < 1 || t.get().getSize().getY() < 1) { h.fail("empty blueprint " + k + "/" + s); return; }
+            }
+        }
+        // place a desert house and a snow house: the palette follows the family
+        BlockPos desert = h.absolutePos(new BlockPos(2, 1, 2));
+        BlockPos snow = h.absolutePos(new BlockPos(13, 1, 2));
+        place(h, BlueprintPool.Kind.HOUSE, BiomeStyle.DESERT, desert);
+        place(h, BlueprintPool.Kind.HOUSE, BiomeStyle.SNOW, snow);
+        h.assertTrue(h.getLevel().getBlockState(desert.offset(0, 1, 0)).is(Blocks.CUT_SANDSTONE), "desert corner is sandstone");
+        h.assertTrue(h.getLevel().getBlockState(snow.offset(0, 1, 0)).is(Blocks.SPRUCE_LOG), "snow corner is spruce");
+        h.assertTrue(h.getLevel().getBlockState(snow.offset(1, 1, 4)).getBlock() instanceof BedBlock, "house has a bed");
+        h.succeed();
+    }
+
+    private static void place(GameTestHelper h, BlueprintPool.Kind k, BiomeStyle s, BlockPos at) {
+        BlueprintPool.load(h.getLevel(), k, s).orElseThrow().placeInWorld(h.getLevel(), at, at,
+                new net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings(),
+                h.getLevel().getRandom(), 2);
     }
 
     @GameTest(template = ARENA)
