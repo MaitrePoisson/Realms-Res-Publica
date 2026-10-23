@@ -128,6 +128,17 @@ public final class TestWorld {
         return b;
     }
 
+    /** Mémorise (pour {@link #cleanup()}) les blocs d'un carré autour de `center`, de 1 sous le sol à 4 au-dessus. */
+    public void rememberArea(Location center, int radius) {
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = -1; y <= 4; y++) {
+                    remember(center.clone().add(x, y, z).getBlock());
+                }
+            }
+        }
+    }
+
     private void remember(Block b) {
         changed.putIfAbsent(b, b.getBlockData());
     }

@@ -4,6 +4,8 @@ import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Villager;
 import rrp.bukkit.behaviors.BehaviorContext;
+import rrp.bukkit.behaviors.Builder;
+import rrp.bukkit.behaviors.Diplomat;
 import rrp.bukkit.behaviors.Farmer;
 import rrp.bukkit.behaviors.Forester;
 import rrp.bukkit.behaviors.Guard;
@@ -47,6 +49,8 @@ public final class BehaviorScheduler {
         register(new Miner());
         register(new Steward());
         register(new Guard());
+        register(new Builder());
+        register(new Diplomat());
     }
 
     public void register(RoleBehavior behavior) {
@@ -110,7 +114,7 @@ public final class BehaviorScheduler {
     }
 
     private boolean run(RoleBehavior b, VillageSite site, World world, Villager villager, VillagerState st) {
-        boolean did = b.runOnce(new BehaviorContext(world, villager, st, site, warehouse, config.get()));
+        boolean did = b.runOnce(new BehaviorContext(world, villager, st, site, warehouse, config.get(), registry));
         if (did) {
             actions++;
         }

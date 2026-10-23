@@ -39,6 +39,7 @@ tasks.jar {
 
 tasks.test {
     useJUnitPlatform()
+    System.getenv("TMPDIR")?.let { systemProperty("java.io.tmpdir", it) }
     testLogging {
         events("passed", "failed", "skipped")
         showStandardStreams = false

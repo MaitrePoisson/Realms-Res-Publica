@@ -2,9 +2,11 @@ package rrp.bukkit;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.World;
 import org.bukkit.block.data.Ageable;
+import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.Creeper;
 import org.bukkit.entity.Villager;
 import org.bukkit.inventory.ItemStack;
@@ -28,7 +30,8 @@ final class BehaviorCases {
         return List.of(farmerHarvestsAndReplants(), foresterFellsAndReplants(), minerBreaksOreAndStone(),
                 lowMoraleMeansNoAction(), actionsStayInWorkRadius(), actionsFollowCadence(),
                 stewardFeedsHungryFromBarrel(), stewardWithoutFoodOrMorale(), guardKillsNearbyMonster(),
-                guardIgnoresFarMonsterAndDisobeys());
+                guardIgnoresFarMonsterAndDisobeys(), builderRaisesHutWithBed(), builderNeedsWoodAndBeds(),
+                diplomatVisitsNeighbour(), diplomatTalksWithoutNeighbour());
     }
 
     /** Un village de trois villageois dont le premier a le rôle testé, avec un tonneau-entrepôt vide. */
@@ -222,6 +225,101 @@ final class BehaviorCases {
             p.adapter().stateOf(r.worker()).setMorale(5);
             check(!p.behaviors().work(r.site(), w.world(), r.worker()), "garde démoralisé au travail");
             check(near.isValid() && !near.isDead(), "monstre tué malgré la désobéissance");
+        });
+    }
+    private static void stockWood(RrpPlugin p, Rig r, World world, int planks) {
+        p.warehouse().deposit(r.site(), world, new ItemStack(Material.OAK_PLANKS, planks));
+    }
+
+    /** Compte les blocs de ce type et les têtes de lit dans le carré de `radius` autour de `center`. */
+    private static int[] countAround(World world, Location center, int radius) {
+        int planks = 0;
+        int beds = 0;
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                for (int y = 0; y <= 3; y++) {
+                    Block b = center.clone().add(x, y, z).getBlock();
+                    if (b.getType() == Material.OAK_PLANKS) {
+                        planks++;
+                    } else if (Tag.BEDS.isTagged(b.getType()) && ((Bed) b.getBlockData()).getPart() == Bed.Part.HEAD) {
+                        beds++;
+                    }
+                }
+            }
+        }
+        return new int[] {planks, beds};
+    }
+
+    private static SelftestCase builderRaisesHutWithBed() {
+        return of("bâtisseur : consomme du bois du tonneau et pose une hutte avec un vrai lit (lits +1)", (w, p) -> {
+            Rig r = rig(w, p, 7000, 7000, Role.BUILDER);
+            w.rememberArea(r.ground(), 14);
+            stockWood(p, r, w.world(), 64);
+            int cost = (int) p.simConfig().get(rrp.core.SimConfig.Key.HUT_WOOD);
+            r.site().state().setBeds(1);
+            int[] before = countAround(w.world(), r.ground(), 14);
+            check(before[0] == 0 && before[1] == 1, "décor inattendu : " + before[0] + " planches, " + before[1] + " lits");
+            check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "le bâtisseur n'a rien fait");
+            check(stock(r, p, w.world(), Resource.WOOD) == 64 - cost, "bois au tonneau : " + stock(r, p, w.world(), Resource.WOOD));
+            check(r.site().state().beds() == 2, "lits de l'état : " + r.site().state().beds());
+            int[] after = countAround(w.world(), r.ground(), 14);
+            check(after[0] == 30, "planches posées : " + after[0]);
+            check(after[1] == 2, "lits réels : " + after[1]);
+        });
+    }
+
+    private static SelftestCase builderNeedsWoodAndBeds() {
+        return of("bâtisseur : ne bâtit ni sans assez de bois, ni sans manque de lits, ni démoralisé", (w, p) -> {
+            Rig r = rig(w, p, 7300, 7300, Role.BUILDER);
+            w.rememberArea(r.ground(), 14);
+            int cost = (int) p.simConfig().get(rrp.core.SimConfig.Key.HUT_WOOD);
+            r.site().state().setBeds(1);
+            stockWood(p, r, w.world(), cost - 1);
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "bâti sans assez de bois");
+            stockWood(p, r, w.world(), 64);
+            int wood = stock(r, p, w.world(), Resource.WOOD);
+            r.site().state().setBeds(r.site().state().population());
+            check(!p.behaviors().runOnce(r.site(), w.world(), r.worker()), "bâti alors qu'il y a assez de lits");
+            r.site().state().setBeds(1);
+            p.adapter().stateOf(r.worker()).setMorale(5);
+            check(!p.behaviors().work(r.site(), w.world(), r.worker()), "bâtisseur démoralisé au travail");
+            check(stock(r, p, w.world(), Resource.WOOD) == wood, "du bois a été consommé sans construire");
+            check(countAround(w.world(), r.ground(), 14)[0] == 0, "des planches ont été posées");
+        });
+    }
+
+    private static SelftestCase diplomatVisitsNeighbour() {
+        return of("diplomate : visite le village voisin et les relations montent de relations_per_visit", (w, p) -> {
+            Rig r = rig(w, p, 7600, 7600, Role.DIPLOMAT);
+            List<Villager> others = new ArrayList<>();
+            VillageSite neighbour = RoleCases.villageOf(w, p, 7800, 7600, 3, others);
+            double gain = p.simConfig().get(rrp.core.SimConfig.Key.RELATIONS_PER_VISIT);
+            check(r.site().state().relations() == 0 && neighbour.state().relations() == 0, "relations de départ non nulles");
+            check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "le diplomate n'a rien fait");
+            check(r.site().state().relations() == gain, "relations : " + r.site().state().relations());
+            check(neighbour.state().relations() == gain, "relations du voisin : " + neighbour.state().relations());
+            p.adapter().stateOf(r.worker()).setMorale(5);
+            check(!p.behaviors().work(r.site(), w.world(), r.worker()), "diplomate démoralisé au travail");
+            check(r.site().state().relations() == gain, "relations changées malgré la désobéissance");
+        });
+    }
+
+    private static SelftestCase diplomatTalksWithoutNeighbour() {
+        return of("diplomate : sans voisin, parle aux villageois et renforce leur loyauté", (w, p) -> {
+            Rig r = rig(w, p, 8000, 8000, Role.DIPLOMAT);
+            double bonus = p.simConfig().get(rrp.core.SimConfig.Key.TALK_LOYALTY_BONUS);
+            for (VillagerState st : r.site().state().villagers()) {
+                st.setLoyalty(50);
+            }
+            check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "le diplomate n'a rien fait");
+            int talkedTo = 0;
+            for (VillagerState st : r.site().state().villagers()) {
+                if (st.loyalty() == 50 + bonus) {
+                    talkedTo++;
+                }
+            }
+            check(talkedTo == r.site().state().population() - 1, "villageois ayant gagné en loyauté : " + talkedTo);
+            check(r.site().state().relations() == 0, "relations modifiées sans voisin");
         });
     }
 }

@@ -93,5 +93,9 @@ behavior_interval_s: 10
 work_radius: 16
 # Relations gagnées à chaque visite réussie du diplomate. [0 ; 100]
 relations_per_visit: 5
+# Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]
+hut_wood: 30
+# Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
+talk_loyalty_bonus: 2
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
