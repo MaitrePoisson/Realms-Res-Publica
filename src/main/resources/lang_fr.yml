@@ -49,6 +49,7 @@ status.timers: "Minuteurs de crise (s) — contestation : {0}, exil : {1}, guerr
 status.stock: "Stock : {0}"
 status.orders: "Ordres de construction : {0}"
 status.defense: "Defenses : stade {0} (0 aucune, 1 palissade, 2 pierre), palissade {1}/{3}, pierre {2}/{3}, tours {4}"
+status.built: "Bâtiments : {0}, routes : {1} ({2} tuiles posées)"
 status.chests: "Coffres communautaires : {0}"
 status.no_warehouse: "pas d'entrepôt désigné"
 error.usage_setrole: "§cUsage : /respublica setrole <fermier|forestier|mineur|garde|intendant|batisseur|diplomate> [uuid]"

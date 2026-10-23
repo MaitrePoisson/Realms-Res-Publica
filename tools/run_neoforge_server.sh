@@ -24,7 +24,7 @@ run_phase() {
       sleep 1
     done
     sleep 3
-    for c in "$@"; do echo "$c"; sleep 2; done
+    for c in "$@"; do echo "$c"; sleep "${PHASE_DELAY:-2}"; done
     sleep 2
     echo stop
     sleep 30
@@ -77,5 +77,30 @@ for pat in "Famine provoquée à village-1" "gronde" "fondent un campement" "Cam
   grep -q "$pat" "$LOG3" || { echo "SERVER: phase 3 missing: $pat"; grep -E "gronde|campement|Guerre|Trêve|village-1|camp-" "$LOG3" | tail -n 12; exit 1; }
 done
 echo "SERVER: crisis chain famine -> contestation -> exile (camp built) -> civil war ran on the real server"
+
+# Phase 4 (fresh world): autonomous growth of a small village (hall, orders, buildings, roads, defenses) + tick cost
+LOG4="$ROOT/.athanor/.verif/server4.log"
+sed -i 's/^level-name=.*/level-name=rrp-urban-world/' run/server.properties
+rm -rf run/rrp-urban-world
+ACTS=()
+for i in $(seq 1 90); do ACTS+=("rrp village act"); done
+STOCK=()
+for i in $(seq 0 13); do STOCK+=("item replace block ~3 ~ ~3 container.$i with minecraft:oak_log 64"); done
+for i in $(seq 14 26); do STOCK+=("item replace block ~3 ~ ~3 container.$i with minecraft:cobblestone 64"); done
+VILL=()
+for k in "1 0" "-1 0" "0 1" "0 -1" "2 1" "-2 -1" "1 2" "-1 -2" "3 0" "-3 0"; do VILL+=("summon minecraft:villager ~$(echo $k | cut -d' ' -f1) ~ ~$(echo $k | cut -d' ' -f2) {NoAI:1b}"); done
+PHASE_DELAY=0.4 run_phase "$LOG4" "difficulty peaceful" "forceload add -48 -110 80 50" "${VILL[@]}"   "setblock ~2 ~ ~2 minecraft:red_bed[part=head,facing=east]" "setblock ~3 ~ ~3 minecraft:barrel" "${STOCK[@]}"   "rrp village scan" "rrp warehouse set" "rrp townhall build" "rrp village scan"   "execute as @e[type=minecraft:villager,limit=3,sort=nearest] at @s run rrp setrole batisseur" "execute as @e[type=minecraft:villager,limit=2,sort=furthest] at @s run rrp setrole intendant"   "execute as @e[type=minecraft:villager,limit=2,sort=random] at @s run rrp setrole garde" "rrp village scan" "rrp status village-1"   "${ACTS[@]}" "rrp village scan" "rrp status village-1" "tick query" "rrp village flush"
+if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG4"; then echo "SERVER: mod error in log (phase 4)"; grep -E "\[.*/ERROR\]" "$LOG4" | head -5; exit 1; fi
+grep -q "Hôtel de Ville de village-1 posé" "$LOG4" || { echo "SERVER: phase 4 hall not built"; exit 1; }
+BUILT="$(grep "Bâtiments :" "$LOG4" | tail -n1)"
+echo "SERVER: urban growth -> $BUILT"
+echo "$BUILT" | grep -q -E "HOUSE|FARM|WORKSHOP|TOWER" || { echo "SERVER: phase 4 no building was completed autonomously"; grep -E "Ordres de construction|Defenses|Bâtiments" "$LOG4" | tail -n 6; exit 1; }
+grep -E "Ordres de construction|Defenses|Coffres" "$LOG4" | tail -n 3
+mkdir -p "$ROOT/.athanor/visuels"; python3 "$ROOT/tools/topdown.py" run/rrp-urban-world "$ROOT/.athanor/visuels/m38-village.png" > /dev/null 2>&1 || echo "SERVER: top-down export skipped"
+grep -E "tick|P50|P95|ms" "$LOG4" | grep -i -E "average|P50|P95" | tail -n 2
+
+# leave no stray world behind: the GameTest server reads run/server.properties and would load these villages
+sed -i 's/^level-name=.*/level-name=rrp-test-world/' run/server.properties
+rm -rf run/rrp-crisis-world run/rrp-urban-world
 
 echo "SERVER: mod loaded, commands answered, village + roles survived a restart"

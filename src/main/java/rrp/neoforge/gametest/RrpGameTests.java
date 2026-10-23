@@ -204,6 +204,32 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "planner")
+    public static void planner(GameTestHelper h) {
+        try {
+            VillageSite site = village(h, 8, 1, 0);
+            BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+            TownHall.build(h.getLevel(), hall);
+            site.setHall(hall.getX(), hall.getY(), hall.getZ());
+            setAll(h, Role.STEWARD);
+            var store = WarehouseService.barrel(site, h.getLevel());
+            store.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+            store.setItem(1, new ItemStack(Items.COBBLESTONE, 64));
+            store.setItem(2, new ItemStack(Items.OAK_LOG, 64));
+            RrpMod.warehouse().refresh(site, h.getLevel());
+            h.assertTrue(site.orders().isEmpty(), "no order yet");
+            for (int i = 0; i < 3; i++) {
+                act(h, site);
+            }
+            h.assertTrue(!site.orders().isEmpty(), "steward issued no order for a bed shortage");
+            h.assertTrue(site.orders().get(0).type() == rrp.neoforge.urban.BuildType.HOUSE, "first order is a house");
+            h.assertTrue(site.orders().size() <= 3, "orders capped");
+            h.succeed();
+        } finally {
+            wipeTown(h);
+        }
+    }
+
     @GameTest(template = ARENA, batch = "communityStore")
     public static void communityStore(GameTestHelper h) {
         try {
