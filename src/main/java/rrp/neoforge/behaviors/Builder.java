@@ -113,6 +113,8 @@ public final class Builder extends RoleBehavior {
                 }
             }
         }
-        return true;
+        // jamais sur un être vivant : la hutte l'emmurerait (il mourrait étouffé)
+        return w.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                new net.minecraft.world.phys.AABB(o.getX(), o.getY(), o.getZ(), o.getX() + WIDTH, o.getY() + HEIGHT, o.getZ() + DEPTH)).isEmpty();
     }
 }

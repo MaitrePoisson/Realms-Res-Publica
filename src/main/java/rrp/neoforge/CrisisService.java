@@ -189,6 +189,13 @@ public final class CrisisService {
                 : BlockPos.containing(camp.x(), camp.y(), camp.z());
         int tents = Math.min(x.villagerIds().size(), CampBuilder.maxTents());
         CampBuilder.Result built = camps.build(world, fire, tents, fresh);
+        int wool = 0;
+        for (int dx = -CampBuilder.CAMP_RADIUS; dx <= CampBuilder.CAMP_RADIUS; dx++)
+            for (int dz = -CampBuilder.CAMP_RADIUS; dz <= CampBuilder.CAMP_RADIUS; dz++)
+                for (int dy = -2; dy <= 4; dy++)
+                    if (world.getBlockState(built.fire().offset(dx, dy, dz)).is(net.minecraft.tags.BlockTags.WOOL)) wool++;
+        log.info("[Res Publica] Campement vérifié : {} bloc(s) de laine, tonneau {}, {} lit(s).", wool,
+                world.getBlockState(built.barrel()).is(net.minecraft.world.level.block.Blocks.BARREL) ? "présent" : "ABSENT", built.beds());
         if (fresh) {
             camp = registry.adopt(campState, village.worldName(), built.fire().getX() + 0.5, built.fire().getY(),
                     built.fire().getZ() + 0.5, CampBuilder.CAMP_RADIUS);

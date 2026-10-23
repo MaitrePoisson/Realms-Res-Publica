@@ -73,7 +73,7 @@ run_phase "$LOG3" "difficulty easy" "forceload add -48 -110 10 -60" \
   "execute as @e[type=minecraft:villager] at @s run rrp setrole garde" "rrp famine" "rrp status village-1" \
   "${TICKS[@]}" "rrp village list" "rrp status village-1"
 if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG3"; then echo "SERVER: mod error in log (phase 3)"; grep -E "\[.*/ERROR\]" "$LOG3" | head -5; exit 1; fi
-for pat in "Famine provoquée à village-1" "gronde" "fondent un campement" "Guerre civile : village-1 et village-1-camp"; do
+for pat in "Famine provoquée à village-1" "gronde" "fondent un campement" "Campement vérifié : [1-9][0-9]* bloc(s) de laine, tonneau présent" "Guerre civile : village-1 et village-1-camp"; do
   grep -q "$pat" "$LOG3" || { echo "SERVER: phase 3 missing: $pat"; grep -E "gronde|campement|Guerre|Trêve|village-1|camp-" "$LOG3" | tail -n 12; exit 1; }
 done
 echo "SERVER: crisis chain famine -> contestation -> exile (camp built) -> civil war ran on the real server"
