@@ -340,6 +340,90 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "roads")
+    public static void roads(GameTestHelper h) {
+        try {
+            roadsBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void roadsBody(GameTestHelper h) {
+        for (int x = 0; x < 24; x++) {
+            for (int z = 0; z < 24; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.GRASS_BLOCK);
+                h.setBlock(new BlockPos(x, 11, z), Blocks.AIR);
+            }
+        }
+        VillageSite site = village(h, 8, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(18, 2, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        BlockPos target = h.absolutePos(new BlockPos(3, 2, 4));
+        // a small pond between hall and target: the road must go around it
+        for (int x = 9; x <= 11; x++) {
+            for (int z = 8; z <= 14; z++) {
+                h.setBlock(new BlockPos(x, 1, z), Blocks.WATER);
+            }
+        }
+        var road = new rrp.neoforge.urban.RoadNetwork.Road(hall.getX(), hall.getZ(), target.getX(), target.getZ(), true, null, 0, 0);
+        site.roads().add(road);
+        BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.COBBLESTONE, 64));
+        barrel.setItem(1, new ItemStack(Items.COBBLESTONE, 64));
+        RrpMod.warehouse().refresh(site, level);
+        setAll(h, Role.BUILDER);
+        h.assertTrue(act(h, site), "builder did not start the road");
+        h.assertTrue(road.hasPath() && road.laid() > 0, "path planned and tiles laid");
+        h.assertTrue(rrp.neoforge.RrpMod.persistence().flush(), "flush");
+        RrpMod.persistence().load();
+        VillageSite again = RrpMod.registry().all().stream().findFirst().orElseThrow();
+        h.assertTrue(again.roads().size() == 1 && again.roads().get(0).length() == road.length()
+                && again.roads().get(0).laid() == road.laid(), "road persisted");
+        var r = again.roads().get(0);
+        int guard = 0;
+        while (!r.laidDone() && guard++ < 60) {
+            act(h, again);
+        }
+        h.assertTrue(r.laidDone(), "road laid");
+        int[] p = r.path();
+        int y = hall.getY() - 1;
+        for (int i = 0; i < r.length(); i++) {
+            h.assertTrue(level.getBlockState(new BlockPos(p[2 * i], y, p[2 * i + 1])).is(Blocks.DIRT_PATH)
+                    || p[2 * i] == hall.getX() && p[2 * i + 1] == hall.getZ()
+                    || !level.getBlockState(new BlockPos(p[2 * i], y, p[2 * i + 1])).is(Blocks.WATER), "dirt path at step " + i);
+            h.assertTrue(!level.getBlockState(new BlockPos(p[2 * i], y, p[2 * i + 1])).is(Blocks.WATER), "road in the water");
+            if (i > 0) {
+                h.assertTrue(Math.abs(p[2 * i] - p[2 * i - 2]) + Math.abs(p[2 * i + 1] - p[2 * i - 1]) == 1, "road connected");
+            }
+        }
+        h.assertTrue(Math.abs(p[p.length - 2] - target.getX()) <= 6 && Math.abs(p[p.length - 1] - target.getZ()) <= 6, "reaches the target");
+        h.assertTrue(Math.hypot(p[0] - hall.getX(), p[1] - hall.getZ()) <= 8, "starts at the hall");
+        // wide road: the lateral neighbour is laid too
+        int dirt = 0;
+        for (int x = 0; x < 24; x++) {
+            for (int z = 0; z < 24; z++) {
+                if (level.getBlockState(h.absolutePos(new BlockPos(x, 1, z))).is(Blocks.DIRT_PATH)
+                        || rrp.neoforge.urban.RoadNetwork.isRoadBlock(level.getBlockState(h.absolutePos(new BlockPos(x, 1, z))))) {
+                    dirt++;
+                }
+            }
+        }
+        h.assertTrue(dirt >= r.length() * 3 / 2, "two tiles wide: " + dirt + " tiles for " + r.length() + " positions");
+        // upgrade: enough stone and population -> paved
+        guard = 0;
+        while (!r.pavedDone() && guard++ < 60) {
+            act(h, again);
+        }
+        h.assertTrue(r.pavedDone(), "road paved");
+        h.assertTrue(rrp.neoforge.urban.RoadNetwork.allPaved(level, r, hall.getY() - 1), "every tile is stone");
+        RrpMod.warehouse().refresh(again, level);
+        h.assertTrue(again.state().stock(Resource.STONE) < 128, "stone consumed by the paving");
+        h.succeed();
+    }
+
     @GameTest(template = ARENA)
     public static void roles(GameTestHelper h) {
         village(h, 2, 2, 32);
@@ -401,7 +485,7 @@ public final class RrpGameTests {
         h.succeed();
     }
 
-    @GameTest(template = ARENA)
+    @GameTest(template = ARENA, batch = "war")
     public static void crisesAndWar(GameTestHelper h) {
         VillageSite site = village(h, 6, 1, 0);
         setAll(h, Role.GUARD);

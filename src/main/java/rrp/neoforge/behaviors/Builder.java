@@ -16,6 +16,7 @@ import rrp.neoforge.Worlds;
 import rrp.neoforge.urban.BlueprintPool;
 import rrp.neoforge.urban.BuildOrder;
 import rrp.neoforge.urban.ConstructionSite;
+import rrp.neoforge.urban.RoadNetwork;
 import rrp.neoforge.urban.TerrainLeveler;
 
 import java.util.Optional;
@@ -37,6 +38,8 @@ public final class Builder extends RoleBehavior {
     static final int STEPS_PER_ACTION = 6;
     /** Distance maximale (anneaux) de la recherche d'emplacement autour de la cible de l'ordre. */
     static final int SEARCH_RING = 14;
+    /** Nombre maximal de routes par village. */
+    static final int MAX_ROADS = 24;
 
     @Override
     public Role role() {
@@ -48,8 +51,15 @@ public final class Builder extends RoleBehavior {
         if (!ctx.site().hasHall()) {
             return buildTownHall(ctx);
         }
+        if (ctx.site().hasWarehouse() && (ctx.site().construction() != null || !ctx.site().orders().isEmpty())
+                && construct(ctx)) {
+            return true;
+        }
+        if (ctx.site().hasWarehouse() && ctx.site().construction() == null && workOnRoads(ctx)) {
+            return true;
+        }
         if (ctx.site().hasWarehouse() && (ctx.site().construction() != null || !ctx.site().orders().isEmpty())) {
-            return construct(ctx);
+            return false;
         }
         if (!ctx.site().hasWarehouse() || ctx.site().state().beds()
                 >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
@@ -142,7 +152,73 @@ public final class Builder extends RoleBehavior {
         site.built().merge(cs.type(), 1, Integer::sum);
         site.state().setBeds(site.state().beds() + cs.countBeds(ctx.level(), t));
         site.setConstruction(null);
+        addRoad(ctx, cs.origin().getX() + t.getSize().getX() / 2, cs.origin().getZ() + t.getSize().getZ() / 2, true);
         ctx.registry().markDirty();
+    }
+
+    /** Commande une route de l'Hôtel de Ville vers {@code (x,z)} si aucune n'y mène déjà (plafond {@link #MAX_ROADS}). */
+    static void addRoad(BehaviorContext ctx, int x, int z, boolean wide) {
+        var site = ctx.site();
+        int[] hall = site.hall();
+        if (hall == null || site.roads().size() >= MAX_ROADS || site.roads().stream().anyMatch(r -> r.sameTarget(x, z))) {
+            return;
+        }
+        site.roads().add(new RoadNetwork.Road(hall[0], hall[2], x, z, wide, null, 0, 0));
+    }
+
+    /** Relie l'Hôtel de Ville aux villages et campements voisins de la même dimension. */
+    private static void linkNeighbours(BehaviorContext ctx) {
+        int max = (int) ctx.config().get(SimConfig.Key.ROAD_LINK_DISTANCE);
+        var site = ctx.site();
+        for (var other : ctx.registry().all()) {
+            if (other == site || max <= 0 || !other.worldName().equals(site.worldName())) {
+                continue;
+            }
+            int[] oh = other.hall();
+            int ox = oh != null ? oh[0] : (int) other.x();
+            int oz = oh != null ? oh[2] : (int) other.z();
+            if (Math.hypot(ox - site.x(), oz - site.z()) <= max) {
+                addRoad(ctx, ox, oz, false);
+            }
+        }
+    }
+
+    /** Pose le sentier d'une route, puis la pave quand la pierre et la population le permettent. Vrai si quelque chose a été fait. */
+    private boolean workOnRoads(BehaviorContext ctx) {
+        var site = ctx.site();
+        linkNeighbours(ctx);
+        int ground = site.hall()[1] - 1;
+        for (var road : new java.util.ArrayList<>(site.roads())) {
+            if (!road.hasPath() && !RoadNetwork.plan(ctx.level(), road, ground)) {
+                site.roads().remove(road);
+                ctx.registry().markDirty();
+                continue;
+            }
+            if (!road.laidDone()) {
+                int i = Math.min(road.laid(), road.length() - 1);
+                walkToward(ctx, new BlockPos(road.path()[2 * i], ground, road.path()[2 * i + 1]));
+                RoadNetwork.lay(ctx.level(), road, RoadNetwork.TILES_PER_STEP, ground);
+                ctx.registry().markDirty();
+                return true;
+            }
+            if (!road.pavedDone() && canPave(ctx)) {
+                int batch = Math.min(RoadNetwork.TILES_PER_STEP, road.length() - road.paved());
+                int cost = (batch + 1) / 2;
+                if (ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, cost) < cost) {
+                    continue;
+                }
+                RoadNetwork.pave(ctx.level(), road, batch, ground);
+                ctx.registry().markDirty();
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean canPave(BehaviorContext ctx) {
+        return ctx.site().state().population() >= (int) ctx.config().get(SimConfig.Key.ROAD_PAVE_POPULATION)
+                && ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.STONE, 0)
+                >= (int) ctx.config().get(SimConfig.Key.ROAD_PAVE_STONE_STOCK);
     }
 
     /** Tout village a un Hôtel de Ville : à défaut, le bâtisseur en pose un près du centre. */

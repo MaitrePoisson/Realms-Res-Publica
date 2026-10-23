@@ -4,6 +4,7 @@ import rrp.core.VillageState;
 import rrp.neoforge.urban.BuildOrder;
 import rrp.neoforge.urban.BuildType;
 import rrp.neoforge.urban.ConstructionSite;
+import rrp.neoforge.urban.RoadNetwork;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -29,6 +30,8 @@ public final class VillageSite {
     private final List<BuildOrder> orders = new ArrayList<>();
     /** Chantier en cours (un seul à la fois), ou {@code null}. */
     private ConstructionSite construction;
+    /** Routes du village (tracé, posées puis pavées), dans l'ordre de commande. */
+    private final List<RoadNetwork.Road> roads = new ArrayList<>();
     /** Nombre de bâtiments construits par type (hors huttes historiques). */
     private final Map<BuildType, Integer> built = new EnumMap<>(BuildType.class);
 
@@ -68,6 +71,7 @@ public final class VillageSite {
     }
 
     public List<BuildOrder> orders() { return orders; }
+    public List<RoadNetwork.Road> roads() { return roads; }
     public Map<BuildType, Integer> built() { return built; }
     public ConstructionSite construction() { return construction; }
     public void setConstruction(ConstructionSite c) { this.construction = c; }

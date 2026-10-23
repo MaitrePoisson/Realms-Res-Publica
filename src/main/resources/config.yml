@@ -119,6 +119,12 @@ expansion_stone_quota: 40
 expansion_population_quota: 6
 # Nombre maximal d'ordres de construction en attente par village. [1 ; 50]
 max_build_orders: 3
+# Stock de pierre a partir duquel les routes de terre sont pavees (1 pierre pour 2 positions pavees). [0 ; 100000]
+road_pave_stone_stock: 60
+# Population minimale du village avant de paver ses routes. [0 ; 1000]
+road_pave_population: 8
+# Distance maximale (blocs) a laquelle une route relie l'Hotel de Ville a un autre village ou campement. 0 = jamais. [0 ; 1000]
+road_link_distance: 160
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

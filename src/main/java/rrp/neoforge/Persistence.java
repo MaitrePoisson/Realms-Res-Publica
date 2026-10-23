@@ -173,6 +173,28 @@ public final class Persistence {
             co.addProperty("step", s.construction().step());
             o.add("construction", co);
         }
+        if (!s.roads().isEmpty()) {
+            JsonArray ra = new JsonArray();
+            for (var r : s.roads()) {
+                JsonObject ro = new JsonObject();
+                ro.addProperty("fx", r.fromX());
+                ro.addProperty("fz", r.fromZ());
+                ro.addProperty("tx", r.toX());
+                ro.addProperty("tz", r.toZ());
+                ro.addProperty("wide", r.wide());
+                ro.addProperty("laid", r.laid());
+                ro.addProperty("paved", r.paved());
+                if (r.hasPath()) {
+                    JsonArray pa = new JsonArray();
+                    for (int v : r.path()) {
+                        pa.add(v);
+                    }
+                    ro.add("path", pa);
+                }
+                ra.add(ro);
+            }
+            o.add("roads", ra);
+        }
         if (!s.built().isEmpty()) {
             JsonObject bt = new JsonObject();
             s.built().forEach((t, n) -> bt.addProperty(t.name(), n));
@@ -247,6 +269,22 @@ public final class Persistence {
             s.setConstruction(new rrp.neoforge.urban.ConstructionSite(BuildType.valueOf(co.get("type").getAsString()),
                     new net.minecraft.core.BlockPos(co.get("x").getAsInt(), co.get("y").getAsInt(), co.get("z").getAsInt()),
                     co.get("step").getAsInt()));
+        }
+        if (o.has("roads")) {
+            for (JsonElement e : o.getAsJsonArray("roads")) {
+                JsonObject ro = e.getAsJsonObject();
+                int[] path = null;
+                if (ro.has("path")) {
+                    JsonArray pa = ro.getAsJsonArray("path");
+                    path = new int[pa.size()];
+                    for (int i = 0; i < path.length; i++) {
+                        path[i] = pa.get(i).getAsInt();
+                    }
+                }
+                s.roads().add(new rrp.neoforge.urban.RoadNetwork.Road(ro.get("fx").getAsInt(), ro.get("fz").getAsInt(),
+                        ro.get("tx").getAsInt(), ro.get("tz").getAsInt(), ro.get("wide").getAsBoolean(), path,
+                        ro.get("laid").getAsInt(), ro.get("paved").getAsInt()));
+            }
         }
         if (o.has("built")) {
             for (var e : o.getAsJsonObject("built").entrySet()) {
