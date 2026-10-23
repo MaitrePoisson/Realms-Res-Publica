@@ -4,3 +4,12 @@ main: rrp.bukkit.RrpPlugin
 api-version: '1.20'
 description: Société des villageois - rôles, besoins, démographie et crises.
 authors: [Realms & Res Publica]
+commands:
+  respublica:
+    description: Commandes de Realms & Res Publica (debug, test).
+    usage: /respublica help
+    aliases: [rrp]
+permissions:
+  respublica.admin:
+    description: Accès aux commandes /respublica.
+    default: op
