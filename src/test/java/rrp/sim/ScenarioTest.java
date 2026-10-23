@@ -71,6 +71,14 @@ class ScenarioTest {
     }
 
     @Test
+    void insecurityAloneEscalatesToExile() {
+        Result r = run(Scenario.insecurity());
+        double contest = r.firstTimeAt(Scenario.VILLAGE_ID, CrisisLevel.CONTESTATION);
+        double exile = r.firstTimeAt(Scenario.VILLAGE_ID, CrisisLevel.EXIL);
+        assertTrue(exile > contest, "l'insécurité durable mène à l'exil : " + contest + " puis " + exile);
+    }
+
+    @Test
     void runsAreDeterministic() {
         for (Scenario sc : Scenario.all()) {
             assertEquals(Report.csv(run(sc)), Report.csv(run(sc)), sc.name());

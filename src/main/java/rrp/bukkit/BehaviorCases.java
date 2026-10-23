@@ -98,12 +98,20 @@ final class BehaviorCases {
             for (int i = 0; i < 3; i++) {
                 w.setBlock(base.clone().add(0, i, 0), Material.OAK_LOG);
             }
+            w.setBlock(base.clone().add(0, 3, 0), Material.OAK_LEAVES);
+            // un pilier de hutte (sans feuillage) ne doit jamais être abattu
+            Location pillar = r.at(-3, 8);
+            for (int i = 0; i < 3; i++) {
+                w.setBlock(pillar.clone().add(0, i, 0), Material.OAK_LOG);
+            }
             check(p.behaviors().runOnce(r.site(), w.world(), r.worker()), "le forestier n'a rien fait");
             check(stock(r, p, w.world(), Resource.WOOD) >= 3, "bois au tonneau : " + stock(r, p, w.world(), Resource.WOOD));
             for (int i = 1; i < 3; i++) {
                 check(base.clone().add(0, i, 0).getBlock().getType() == Material.AIR, "tronc resté en l'air à la hauteur " + i);
             }
             check(base.getBlock().getType() == Material.OAK_SAPLING, "pas de pousse : " + base.getBlock().getType());
+            check(pillar.getBlock().getType() == Material.OAK_LOG && pillar.clone().add(0, 2, 0).getBlock().getType() == Material.OAK_LOG,
+                    "un pilier sans feuillage a été abattu");
         });
     }
 

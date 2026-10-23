@@ -65,7 +65,7 @@ final class VillageCases {
     static List<SelftestCase> all() {
         return List.of(warehouseReadsRealContents(), bedsAreCounted(), villageCreatedFromVillagersAndBed(),
                 noVillageWithoutBed(), nearbyVillagesMerge(), scanBudgetRespected(), persistenceRoundTrip(),
-                persistenceBatchesWrites(), commandsReportVillages());
+                persistenceBatchesWrites(), persistenceSurvivesDamagedFile(), commandsReportVillages());
     }
 
     private static SelftestCase warehouseReadsRealContents() {
@@ -182,6 +182,41 @@ final class VillageCases {
                     "budget dépassé : " + p.scanner().maxScannedPerTick() + " > " + budget);
             check(p.scanner().pending() == 0, "travail de scan restant");
             check(s.state().beds() == 40, "40 lits attendus, comptés " + s.state().beds());
+        });
+    }
+
+    private static SelftestCase persistenceSurvivesDamagedFile() {
+        return of("persistance : un village abîmé ou incomplet ne fait pas perdre les autres, copie de secours", (w, p) -> {
+            Location g1 = w.ground(2000, 2000);
+            Location g2 = w.ground(2200, 2200);
+            VillageSite a = p.registry().create(g1, 40);
+            VillageSite b = p.registry().create(g2, 40);
+            a.state().setBeds(3);
+            b.state().setBeds(5);
+            check(p.persistence().flush(), "écriture impossible");
+            File file = new File(p.getDataFolder(), Persistence.FILE);
+            com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(Files.readString(file.toPath())).getAsJsonObject();
+            com.google.gson.JsonArray arr = root.getAsJsonArray("villages");
+            for (com.google.gson.JsonElement e : arr) {
+                if (e.getAsJsonObject().get("id").getAsString().equals(a.id())) {
+                    e.getAsJsonObject().remove("birthTimer"); // champ manquant : valeur par défaut
+                    e.getAsJsonObject().remove("stock");
+                }
+            }
+            arr.add(new com.google.gson.JsonObject()); // village illisible : ignoré
+            Files.writeString(file.toPath(), root.toString());
+            File[] before = p.getDataFolder().listFiles((d, n) -> n.startsWith(Persistence.FILE + ".bak-"));
+            int backups = before == null ? 0 : before.length;
+            p.persistence().load();
+            VillageSite ra = p.registry().get(a.id());
+            VillageSite rb = p.registry().get(b.id());
+            check(ra != null && ra.state().beds() == 3, "le village incomplet n'a pas été relu avec des valeurs par défaut");
+            check(rb != null && rb.state().beds() == 5, "un village sain a été perdu");
+            File[] after = p.getDataFolder().listFiles((d, n) -> n.startsWith(Persistence.FILE + ".bak-"));
+            check(after != null && after.length == backups + 1, "pas de copie de secours du fichier fautif");
+            for (File f : after) {
+                f.delete();
+            }
         });
     }
 

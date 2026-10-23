@@ -146,6 +146,7 @@ final class RoleCases {
         return of("jauges : sans nourriture, satiété et moral baissent", (w, p) -> {
             List<Villager> vs = new ArrayList<>();
             VillageSite s = villageOf(w, p, 3600, 3600, 3, vs);
+            p.warehouse().set(s, w.placeBarrel(s.center(w.world()).add(-3, 0, 0))); // sans entrepôt, pas d'économie de nourriture
             VillagerState v = s.state().villagers().get(0);
             v.setSatiety(60);
             v.setMorale(90);

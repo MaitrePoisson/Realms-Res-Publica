@@ -29,6 +29,8 @@ morale_bed_bonus: 20
 morale_security_bonus: 20
 # Malus de moral cible en cas de surpopulation (villageois > lits x ratio). [0 ; 100]
 morale_crowding_penalty: 20
+# Malus de moral cible quand les menaces dépassent ce que les gardes couvrent (insécurité). [0 ; 100]
+morale_insecurity_penalty: 30
 # Vitesse (points/s) à laquelle la loyauté rejoint sa cible. [0.01 ; 10]
 loyalty_speed_per_s: 0.2
 # Bonus de loyauté cible quand le village compte un diplomate. [0 ; 50]

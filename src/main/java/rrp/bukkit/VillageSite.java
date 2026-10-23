@@ -63,6 +63,14 @@ public final class VillageSite {
         return b.getType() == org.bukkit.Material.BARREL ? b : null;
     }
 
+    /** Vrai si le chunk du centre (et celui de l'entrepôt) est chargé : sinon rien n'y est observable. */
+    public boolean loaded(World world) {
+        if (world == null || !world.isChunkLoaded((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4)) {
+            return false;
+        }
+        return warehouse == null || world.isChunkLoaded(warehouse[0] >> 4, warehouse[2] >> 4);
+    }
+
     /** Distance horizontale au centre. */
     public double distance(String world, double px, double pz) {
         if (!worldName.equals(world)) {

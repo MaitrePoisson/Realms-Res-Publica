@@ -26,6 +26,11 @@ public final class VillageState {
     private double warTimer;
     private double birthTimer;
 
+    /** Non persisté : le village a un entrepôt, donc une économie de nourriture (sinon aucune faim ni famine). */
+    private boolean foodManaged = true;
+    /** Non persisté : le village est chargé dans le monde (sinon ses crises sont gelées). */
+    private boolean active = true;
+
     public VillageState(String id, Faction faction) {
         this.id = id;
         this.faction = faction;
@@ -37,6 +42,10 @@ public final class VillageState {
     public String id() { return id; }
     public Faction faction() { return faction; }
     /** Pour un campement dissident : id du village d'origine ; sinon {@code null}. */
+    public boolean foodManaged() { return foodManaged; }
+    public void setFoodManaged(boolean foodManaged) { this.foodManaged = foodManaged; }
+    public boolean active() { return active; }
+    public void setActive(boolean active) { this.active = active; }
     public String parentId() { return parentId; }
     public void setParentId(String parentId) { this.parentId = parentId; }
     public int beds() { return beds; }

@@ -177,6 +177,53 @@ class CrisisTest {
     }
 
     @Test
+    void secondExileNeverReusesTheIdOfAnAutonomousCamp() {
+        VillageState s = discontentVillage(Role.GUARD, Role.FARMER);
+        List<VillageState> w = world(s);
+        run(w, cfg.getInt(Key.CONTEST_AFTER_S) + cfg.getInt(Key.EXILE_AFTER_S));
+        VillageState first = CrisisEngine.campOf(w, s);
+        assertNotNull(first);
+        first.setParentId(null); // camp devenu autonome après une trêve
+        s.setLevel(CrisisLevel.CONTESTATION);
+        s.setExileTimer(cfg.get(Key.EXILE_AFTER_S));
+        for (int i = 0; i < 6; i++) {
+            s.villagers().add(villager(Role.FARMER, 5));
+        }
+        s.setBeds(10);
+        run(w, 1);
+        VillageState second = CrisisEngine.campOf(w, s);
+        assertNotNull(second);
+        assertTrue(w.contains(first) && !first.id().equals(second.id()), first.id() + " / " + second.id());
+        assertEquals(3, w.size());
+    }
+
+    @Test
+    void villageWithoutWarehouseHasNoFamineAndKeepsItsSatiety() {
+        VillageState s = healthy(5);
+        s.setStock(Resource.FOOD, 0);
+        s.setFoodManaged(false);
+        assertFalse(CrisisEngine.indicators(s, cfg).famine());
+        double before = s.villagers().get(0).satiety();
+        Gauges.step(s, cfg, 600);
+        assertEquals(before, s.villagers().get(0).satiety(), 1e-9);
+        s.setFoodManaged(true);
+        assertTrue(CrisisEngine.indicators(s, cfg).famine());
+    }
+
+    @Test
+    void inactiveVillageIsFrozen() {
+        VillageState s = healthy(5);
+        s.setStock(Resource.FOOD, 0);
+        s.setActive(false);
+        List<SimEvent> events = run(world(s), cfg.getInt(Key.CONTEST_AFTER_S) * 3);
+        assertTrue(events.isEmpty());
+        assertEquals(CrisisLevel.STABLE, s.level());
+        s.setActive(true);
+        run(world(s), cfg.getInt(Key.CONTEST_AFTER_S));
+        assertEquals(CrisisLevel.CONTESTATION, s.level());
+    }
+
+    @Test
     void exileHappensAfterConfiguredDurationAndMovesDiscontents() {
         VillageState s = discontentVillage(Role.GUARD, Role.FARMER);
         List<VillageState> w = world(s);

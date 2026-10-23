@@ -69,7 +69,7 @@ public final class GaugeTicker {
         }
         for (VillageSite site : new ArrayList<>(registry.all())) {
             World w = Bukkit.getWorld(site.worldName());
-            if (w == null) {
+            if (w == null || !site.loaded(w)) { // village non chargé : rien n'y est observable, on gèle son état
                 continue;
             }
             if (sync) {
@@ -89,6 +89,7 @@ public final class GaugeTicker {
             return;
         }
         warehouse.refresh(site, world);
+        state.setFoodManaged(site.hasWarehouse());
         if (refreshThreats) {
             state.setThreats(countThreats(site, world));
         }

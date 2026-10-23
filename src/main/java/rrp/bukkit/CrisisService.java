@@ -105,6 +105,8 @@ public final class CrisisService {
             World w = Bukkit.getWorld(site.worldName());
             if (w != null) {
                 warehouse.refresh(site, w);
+                site.state().setFoodManaged(site.hasWarehouse());
+                site.state().setActive(site.loaded(w));
                 sites.add(site);
                 states.add(site.state());
             }

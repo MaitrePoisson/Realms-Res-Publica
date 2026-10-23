@@ -24,7 +24,7 @@ final class WarCases {
     }
 
     static List<SelftestCase> all() {
-        return List.of(insecurityLeadsToContestation(), warEndsByElimination(), truceReconciles(), truceMakesCampAutonomous());
+        return List.of(insecurityLeadsToContestation(), warEndsByElimination(), truceReconciles(), truceMakesCampAutonomous(), famineChainReachesWar());
     }
 
     private static void setRole(RrpPlugin p, VillagerState s, Role role) {
@@ -97,6 +97,29 @@ final class WarCases {
         village.state().setExileTimer(p.simConfig().get(SimConfig.Key.EXILE_AFTER_S));
         village.state().setWarTimer(p.simConfig().get(SimConfig.Key.WAR_AFTER_S) - 1);
         return new War(village, camp, vs, campers);
+    }
+
+    private static SelftestCase famineChainReachesWar() {
+        return CrisisCases.of("chaîne complète : famine → contestation → exil → guerre civile, sans état amorcé", (w, p) -> {
+            List<Villager> vs = new ArrayList<>();
+            VillageSite s = CrisisCases.village(w, p, 14400, 6, 0, vs);
+            for (VillagerState st : s.state().villagers()) {
+                setRole(p, st, Role.GUARD); // des combattants des deux côtés, aucun diplomate : la trêve est impossible
+            }
+            check(s.state().level() == CrisisLevel.STABLE, "village stable au départ : " + CrisisCases.diag(s));
+            long exilesBefore = p.crises().exiles();
+            long started = p.war().started();
+            boolean[] seen = new boolean[3];
+            int steps = CrisisCases.runUntil(p, 3000, () -> {
+                seen[0] |= s.state().level() == CrisisLevel.CONTESTATION;
+                seen[1] |= p.crises().exiles() > exilesBefore;
+                seen[2] |= p.war().started() > started;
+                return seen[2];
+            });
+            check(steps >= 0, "la guerre n'a pas éclaté après 3000 pas de 10 s : " + CrisisCases.diag(s)
+                    + " contestation=" + seen[0] + " exil=" + seen[1]);
+            check(seen[0] && seen[1], "la chaîne doit passer par la contestation puis l'exil");
+        });
     }
 
     private static SelftestCase warEndsByElimination() {

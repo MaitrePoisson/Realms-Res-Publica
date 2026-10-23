@@ -89,17 +89,38 @@ public final class Persistence {
             return 0;
         }
         int n = 0;
+        boolean problem = false;
         try {
             JsonObject root = JsonParser.parseString(Files.readString(file.toPath(), StandardCharsets.UTF_8)).getAsJsonObject();
             for (JsonElement e : root.getAsJsonArray("villages")) {
-                registry.restore(fromJson(e.getAsJsonObject()));
-                n++;
+                try {
+                    registry.restore(fromJson(e.getAsJsonObject()));
+                    n++;
+                } catch (RuntimeException ex) {
+                    problem = true;
+                    log.severe("village illisible ignoré dans " + file + " : " + ex);
+                }
             }
         } catch (IOException | RuntimeException e) {
+            problem = true;
             log.severe("lecture de " + file + " impossible : " + e);
+        }
+        if (problem) {
+            backup();
         }
         registry.consumeDirty();
         return n;
+    }
+
+    /** Garde une copie du fichier fautif avant que l'arrêt du plugin ne le réécrive. */
+    private void backup() {
+        File bak = new File(file.getParentFile(), FILE + ".bak-" + System.currentTimeMillis());
+        try {
+            Files.copy(file.toPath(), bak.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            log.severe("copie de sauvegarde du fichier fautif : " + bak);
+        } catch (IOException ex) {
+            log.severe("copie de sauvegarde impossible : " + ex.getMessage());
+        }
     }
 
     private static JsonObject toJson(VillageSite s) {
@@ -138,26 +159,36 @@ public final class Persistence {
         return o;
     }
 
+    private static double num(JsonObject o, String key, double def) {
+        return o.has(key) && o.get(key).isJsonPrimitive() ? o.get(key).getAsDouble() : def;
+    }
+
     private static VillageSite fromJson(JsonObject o) {
         VillageState st = new VillageState(o.get("id").getAsString(), Faction.valueOf(o.get("faction").getAsString()));
         if (o.has("parentId")) {
             st.setParentId(o.get("parentId").getAsString());
         }
-        st.setBeds(o.get("beds").getAsInt());
-        st.setLevel(CrisisLevel.valueOf(o.get("level").getAsString()));
-        st.setRelations(o.get("relations").getAsDouble());
-        st.setContestTimer(o.get("contestTimer").getAsDouble());
-        st.setExileTimer(o.get("exileTimer").getAsDouble());
-        st.setWarTimer(o.get("warTimer").getAsDouble());
-        st.setBirthTimer(o.get("birthTimer").getAsDouble());
-        JsonObject stock = o.getAsJsonObject("stock");
+        st.setBeds((int) num(o, "beds", 0));
+        if (o.has("level")) {
+            try {
+                st.setLevel(CrisisLevel.valueOf(o.get("level").getAsString()));
+            } catch (IllegalArgumentException ignored) {
+                // niveau inconnu : le village reste stable
+            }
+        }
+        st.setRelations(num(o, "relations", 0));
+        st.setContestTimer(num(o, "contestTimer", 0));
+        st.setExileTimer(num(o, "exileTimer", 0));
+        st.setWarTimer(num(o, "warTimer", 0));
+        st.setBirthTimer(num(o, "birthTimer", 0));
+        JsonObject stock = o.has("stock") ? o.getAsJsonObject("stock") : new JsonObject();
         for (Resource r : Resource.values()) {
             if (stock.has(r.name())) {
                 st.setStock(r, stock.get(r.name()).getAsInt());
             }
         }
         VillageSite s = new VillageSite(st, o.get("world").getAsString(), o.get("x").getAsDouble(),
-                o.get("y").getAsDouble(), o.get("z").getAsDouble(), o.get("radius").getAsInt());
+                o.get("y").getAsDouble(), o.get("z").getAsDouble(), (int) num(o, "radius", 24));
         if (o.has("warehouse")) {
             JsonArray a = o.getAsJsonArray("warehouse");
             s.setWarehouse(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());

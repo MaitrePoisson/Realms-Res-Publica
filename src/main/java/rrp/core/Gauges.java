@@ -20,8 +20,10 @@ public final class Gauges {
         if (dt <= 0 || village.villagers().isEmpty()) {
             return;
         }
-        decaySatiety(village, cfg, dt);
-        feed(village, cfg);
+        if (village.foodManaged()) { // sans entrepôt, pas d'économie de nourriture : la satiété ne bouge pas
+            decaySatiety(village, cfg, dt);
+            feed(village, cfg);
+        }
         updateMoraleAndLoyalty(village, cfg, dt);
     }
 
@@ -66,6 +68,9 @@ public final class Gauges {
         target += cfg.get(Key.MORALE_SECURITY_BONUS) * securityFactor(village, cfg);
         if (village.population() > village.beds() * cfg.get(Key.OVERPOPULATION_RATIO)) {
             target -= cfg.get(Key.MORALE_CROWDING_PENALTY);
+        }
+        if (securityFactor(village, cfg) == 0.0) {
+            target -= cfg.get(Key.MORALE_INSECURITY_PENALTY);
         }
         return VillagerState.clamp(target);
     }

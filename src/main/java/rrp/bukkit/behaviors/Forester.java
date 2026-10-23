@@ -26,7 +26,7 @@ public final class Forester extends RoleBehavior {
         }
         int done = 0;
         for (int i = 0; i < MAX_PER_RUN; i++) {
-            List<Block> logs = nearby(ctx, 2, 12, Forester::isLog);
+            List<Block> logs = nearby(ctx, 2, 12, b -> isLog(b) && isTreeTrunk(b));
             if (logs.isEmpty()) {
                 break;
             }
@@ -48,6 +48,27 @@ public final class Forester extends RoleBehavior {
             done++;
         }
         return done > 0;
+    }
+
+    /**
+     * Vrai si le tronc appartient à un arbre : sa colonne porte du feuillage à son sommet. Les piliers
+     * des huttes et les cabanes (bois sans feuilles) ne sont jamais abattus.
+     */
+    static boolean isTreeTrunk(Block b) {
+        Block top = b;
+        while (isLog(top.getRelative(0, 1, 0))) {
+            top = top.getRelative(0, 1, 0);
+        }
+        for (int dx = -2; dx <= 2; dx++) {
+            for (int dy = -1; dy <= 4; dy++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    if (Tag.LEAVES.isTagged(top.getRelative(dx, dy, dz).getType())) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     static boolean isLog(Block b) {

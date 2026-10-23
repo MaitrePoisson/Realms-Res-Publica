@@ -40,7 +40,7 @@ public final class CrisisEngine {
     }
 
     public static Indicators indicators(VillageState v, SimConfig cfg) {
-        boolean famine = v.population() > 0 && foodDays(v, cfg) < cfg.get(Key.FAMINE_DAYS_THRESHOLD);
+        boolean famine = v.foodManaged() && v.population() > 0 && foodDays(v, cfg) < cfg.get(Key.FAMINE_DAYS_THRESHOLD);
         boolean overpopulation = v.population() > v.beds() * cfg.get(Key.OVERPOPULATION_RATIO);
         double covered = v.count(Role.GUARD) * cfg.get(Key.INSECURITY_THREATS_PER_GUARD);
         boolean insecurity = v.threats() > 0 && v.threats() > covered;
@@ -91,6 +91,9 @@ public final class CrisisEngine {
         // Un village qui change de niveau pendant ce pas ne franchit pas une seconde marche au même pas.
         List<VillageState> fresh = new ArrayList<>();
         for (VillageState v : List.copyOf(world)) {
+            if (!v.active()) {
+                continue;
+            }
             CrisisLevel before = v.level();
             contestation(v, cfg, dt, events);
             if (v.level() != before) {
@@ -105,7 +108,7 @@ public final class CrisisEngine {
         for (VillageState v : List.copyOf(world)) {
             if (v.faction() == Faction.LOYALIST && !fresh.contains(v)) {
                 VillageState camp = campOf(world, v);
-                if (camp != null) {
+                if (camp != null && v.active() && camp.active()) {
                     war(world, v, camp, cfg, dt, events);
                 }
             }
@@ -200,7 +203,7 @@ public final class CrisisEngine {
         }
         VillageState camp = campOf(world, v);
         if (camp == null) {
-            camp = new VillageState(v.id() + "-camp", Faction.DISSIDENT);
+            camp = new VillageState(freeCampId(world, v.id()), Faction.DISSIDENT);
             camp.setParentId(v.id());
             world.add(camp);
         }
@@ -228,6 +231,24 @@ public final class CrisisEngine {
         v.setExileTimer(cfg.get(Key.EXILE_AFTER_S));
         change(v, CrisisLevel.EXIL, events);
         events.add(new SimEvent.Exile(v.id(), List.copyOf(ids), camp.id(), food));
+    }
+
+    /** Identifiant libre pour un nouveau campement (un camp devenu autonome garde le sien). */
+    private static String freeCampId(List<VillageState> world, String villageId) {
+        String id = villageId + "-camp";
+        for (int n = 2; isTaken(world, id); n++) {
+            id = villageId + "-camp" + n;
+        }
+        return id;
+    }
+
+    private static boolean isTaken(List<VillageState> world, String id) {
+        for (VillageState s : world) {
+            if (s.id().equals(id)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static int combatants(VillageState v) {

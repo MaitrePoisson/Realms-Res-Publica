@@ -29,8 +29,8 @@ public final class Miner extends RoleBehavior {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
-        List<Block> targets = new ArrayList<>(nearby(ctx, 6, 3, Miner::isOre));
-        targets.addAll(nearby(ctx, 6, 3, b -> NATURAL_STONE.contains(b.getType())));
+        List<Block> targets = new ArrayList<>(nearby(ctx, 6, 3, b -> isOre(b) && isExposed(b)));
+        targets.addAll(nearby(ctx, 2, 3, b -> NATURAL_STONE.contains(b.getType()) && isExposed(b)));
         int done = 0;
         for (Block b : targets) {
             if (done >= MAX_PER_RUN) {
@@ -46,6 +46,18 @@ public final class Miner extends RoleBehavior {
             done++;
         }
         return done > 0;
+    }
+
+    /** Le mineur ne creuse pas de galeries sous le village : il ne prend que ce qui affleure (une face à l'air libre). */
+    static boolean isExposed(Block b) {
+        for (org.bukkit.block.BlockFace f : new org.bukkit.block.BlockFace[] {org.bukkit.block.BlockFace.UP,
+                org.bukkit.block.BlockFace.NORTH, org.bukkit.block.BlockFace.SOUTH, org.bukkit.block.BlockFace.EAST,
+                org.bukkit.block.BlockFace.WEST}) {
+            if (b.getRelative(f).getType().isAir()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isOre(Block b) {
