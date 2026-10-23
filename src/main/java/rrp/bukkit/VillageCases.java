@@ -25,12 +25,12 @@ final class VillageCases {
     private VillageCases() {
     }
 
-    private interface Body {
+    interface Body {
         void run(TestWorld w, RrpPlugin p) throws Exception;
     }
 
     /** Cas nommé ; les villages créés pendant le cas sont retirés du registre ensuite. */
-    private static SelftestCase of(String name, Body body) {
+    static SelftestCase of(String name, Body body) {
         return new SelftestCase() {
             public String name() {
                 return name;
@@ -228,15 +228,7 @@ final class VillageCases {
             VillageSite s = p.registry().create(g, 64);
             s.state().setBeds(2);
             List<String> lines = new ArrayList<>();
-            org.bukkit.command.CommandSender console = (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
-                    VillageCases.class.getClassLoader(), new Class<?>[] {org.bukkit.command.CommandSender.class},
-                    (proxy, m, a) -> {
-                        if (m.getName().equals("sendMessage") && a != null && a.length == 1 && a[0] instanceof String t) {
-                            lines.add(t);
-                        }
-                        return m.getName().equals("hasPermission") || m.getName().equals("isOp") ? Boolean.TRUE
-                                : m.getReturnType() == boolean.class ? Boolean.FALSE : null;
-                    });
+            org.bukkit.command.CommandSender console = console(lines);
             Commands c = new Commands(p);
             c.onCommand(console, p.getCommand("respublica"), "respublica", new String[] {"village", "list"});
             check(lines.stream().anyMatch(l -> l.contains(s.id()) && l.contains("2 lit")), "village absent de la liste : " + lines);
@@ -245,5 +237,18 @@ final class VillageCases {
             check(lines.stream().anyMatch(l -> l.contains("lits : 2")), "lits absents du statut : " + lines);
             check(lines.stream().noneMatch(l -> l.contains("?")), "clé de langue manquante : " + lines);
         });
+    }
+
+    /** Console factice qui mémorise les messages reçus et possède toutes les permissions. */
+    static org.bukkit.command.CommandSender console(List<String> lines) {
+        return (org.bukkit.command.CommandSender) java.lang.reflect.Proxy.newProxyInstance(
+                VillageCases.class.getClassLoader(), new Class<?>[] {org.bukkit.command.CommandSender.class},
+                (proxy, m, a) -> {
+                    if (m.getName().equals("sendMessage") && a != null && a.length == 1 && a[0] instanceof String t) {
+                        lines.add(t);
+                    }
+                    return m.getName().equals("hasPermission") || m.getName().equals("isOp") ? Boolean.TRUE
+                            : m.getReturnType() == boolean.class ? Boolean.FALSE : null;
+                });
     }
 }

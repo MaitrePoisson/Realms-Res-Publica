@@ -6,16 +6,21 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Entity;
+import org.bukkit.entity.Villager;
 import rrp.core.Resource;
+import rrp.core.Role;
+import rrp.core.VillagerState;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 /** Commande `/respublica` : sous-commandes de debug et de test. */
 public final class Commands implements CommandExecutor, TabCompleter {
 
-    private static final List<String> SUBS = List.of("help", "selftest", "tick", "village", "warehouse", "status");
+    private static final List<String> SUBS = List.of("help", "selftest", "tick", "village", "warehouse", "status", "inspect", "setrole");
 
     private final RrpPlugin plugin;
     private final TickService ticks;
@@ -43,6 +48,8 @@ public final class Commands implements CommandExecutor, TabCompleter {
             case "village" -> village(sender, args);
             case "warehouse" -> warehouse(sender, args);
             case "status" -> status(sender, args);
+            case "inspect" -> inspect(sender, args);
+            case "setrole" -> setRole(sender, args);
             default -> sender.sendMessage(lang.msg("error.unknown", sub));
         }
         return true;
@@ -137,6 +144,77 @@ public final class Commands implements CommandExecutor, TabCompleter {
         sender.sendMessage(lang.get("status.stock", site.hasWarehouse() ? stock.toString().trim() : lang.get("status.no_warehouse")));
     }
 
+    /** Villageois désigné : UUID donné en argument, sinon celui que vise le joueur, sinon le plus proche. */
+    private Villager targetVillager(CommandSender sender, String uuidArg) {
+        if (uuidArg != null) {
+            try {
+                Entity e = org.bukkit.Bukkit.getEntity(UUID.fromString(uuidArg));
+                return e instanceof Villager v ? v : null;
+            } catch (IllegalArgumentException ex) {
+                return null;
+            }
+        }
+        if (!(sender instanceof Player p)) {
+            return null;
+        }
+        var hit = p.getWorld().rayTraceEntities(p.getEyeLocation(), p.getEyeLocation().getDirection(), 8, 0.5,
+                e -> e instanceof Villager);
+        if (hit != null && hit.getHitEntity() instanceof Villager v) {
+            return v;
+        }
+        Villager best = null;
+        double bestD = 36;
+        for (Entity e : p.getNearbyEntities(6, 6, 6)) {
+            if (e instanceof Villager v && v.getLocation().distanceSquared(p.getLocation()) < bestD) {
+                best = v;
+                bestD = v.getLocation().distanceSquared(p.getLocation());
+            }
+        }
+        return best;
+    }
+
+    private void inspect(CommandSender sender, String[] args) {
+        Villager v = targetVillager(sender, args.length >= 2 ? args[1] : null);
+        if (v == null) {
+            sender.sendMessage(lang.msg("inspect.none"));
+            return;
+        }
+        VillagerState s = plugin.adapter().stateOf(v);
+        if (s == null) {
+            sender.sendMessage(lang.msg("inspect.unadopted", v.getUniqueId()));
+            return;
+        }
+        sender.sendMessage(lang.msg("inspect.line", s.role().label(), Math.round(s.satiety()), Math.round(s.morale()),
+                Math.round(s.loyalty())));
+    }
+
+    /** Minuscules sans accents, pour comparer « Bâtisseur » et « batisseur ». */
+    private static String plain(String text) {
+        return java.text.Normalizer.normalize(text, java.text.Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
+    }
+
+    private void setRole(CommandSender sender, String[] args) {
+        Role role = null;
+        if (args.length >= 2) {
+            for (Role r : Role.values()) {
+                if (r.name().equalsIgnoreCase(args[1]) || plain(r.label()).equals(plain(args[1]))) {
+                    role = r;
+                }
+            }
+        }
+        if (role == null) {
+            sender.sendMessage(lang.msg("error.usage_setrole"));
+            return;
+        }
+        Villager v = targetVillager(sender, args.length >= 3 ? args[2] : null);
+        if (v == null) {
+            sender.sendMessage(lang.msg("inspect.none"));
+            return;
+        }
+        plugin.adapter().setRole(v, role);
+        sender.sendMessage(lang.msg("setrole.done", role.label()));
+    }
+
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         List<String> out = new ArrayList<>();
@@ -150,6 +228,10 @@ public final class Commands implements CommandExecutor, TabCompleter {
             out.addAll(List.of("list", "scan", "flush"));
         } else if (args.length == 2 && args[0].equalsIgnoreCase("warehouse")) {
             out.add("set");
+        } else if (args.length == 2 && args[0].equalsIgnoreCase("setrole")) {
+            for (Role r : Role.values()) {
+                out.add(r.name().toLowerCase(Locale.ROOT));
+            }
         } else if (args.length == 2 && args[0].equalsIgnoreCase("status")) {
             plugin.registry().all().forEach(v -> out.add(v.id()));
         }

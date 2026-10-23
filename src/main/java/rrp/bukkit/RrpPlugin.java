@@ -13,6 +13,8 @@ public final class RrpPlugin extends JavaPlugin {
     private final WarehouseService warehouse = new WarehouseService(registry);
     private SimConfig simConfig = SimConfig.defaults();
     private VillageScanner scanner;
+    private VillagerAdapter adapter;
+    private GaugeTicker gauges;
     private Persistence persistence;
     private Lang lang;
     private Selftest selftest;
@@ -25,9 +27,13 @@ public final class RrpPlugin extends JavaPlugin {
         lang = new Lang(this);
         persistence = new Persistence(registry, getDataFolder(), getLogger());
         scanner = new VillageScanner(() -> simConfig, registry, warehouse);
+        adapter = new VillagerAdapter(() -> simConfig, registry);
+        gauges = new GaugeTicker(() -> simConfig, registry, warehouse, adapter);
+        getServer().getPluginManager().registerEvents(adapter, this);
         int loaded = persistence.load();
         selftest = new Selftest(this, ticks, lang);
         VillageCases.all().forEach(selftest::register);
+        RoleCases.all().forEach(selftest::register);
         Commands commands = new Commands(this);
         PluginCommand cmd = getCommand("respublica");
         if (cmd != null) {
@@ -36,6 +42,7 @@ public final class RrpPlugin extends JavaPlugin {
         }
         worldTimer = t -> {
             scanner.onTicks(t);
+            gauges.onTicks(t);
             persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S));
         };
         ticks.register(worldTimer);
@@ -49,6 +56,9 @@ public final class RrpPlugin extends JavaPlugin {
         ticks.stop();
         if (worldTimer != null) {
             ticks.unregister(worldTimer);
+        }
+        if (gauges != null) {
+            gauges.saveAll();
         }
         if (persistence != null) {
             persistence.flush();
@@ -89,6 +99,14 @@ public final class RrpPlugin extends JavaPlugin {
 
     public VillageScanner scanner() {
         return scanner;
+    }
+
+    public VillagerAdapter adapter() {
+        return adapter;
+    }
+
+    public GaugeTicker gauges() {
+        return gauges;
     }
 
     public Persistence persistence() {

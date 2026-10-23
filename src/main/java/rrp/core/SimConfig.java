@@ -59,7 +59,8 @@ public final class SimConfig {
         // Rôles
         BEHAVIOR_INTERVAL_S(10, 1, 3600),
         WORK_RADIUS(16, 2, 128),
-        RELATIONS_PER_VISIT(5, 0, 100);
+        RELATIONS_PER_VISIT(5, 0, 100),
+        SHOW_ROLE_NAMES(1, 0, 1);
 
         private final double def;
         private final double min;
