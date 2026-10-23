@@ -1,0 +1,115 @@
+# Realms & Res Publica - configuration d'équilibrage.
+# Clés plates ; durées en secondes de simulation. Une valeur non numérique ou hors bornes est
+# ignorée (défaut conservé) et signalée dans la console. Défauts identiques à SimConfig.java.
+
+# ---- Monde ----
+# Rayon (en blocs) d'un village autour de son centre. [16 ; 256]
+village_radius: 64
+# Plafond de blocs examinés par tick serveur (protège les performances). [100 ; 100000]
+max_scan_blocks_per_tick: 2000
+# Intervalle (s) d'écriture groupée de villages.json et des données des villageois. [5 ; 3600]
+persistence_flush_s: 60
+
+# ---- Jauges ----
+# Points de satiété perdus par minute et par villageois. [0 ; 100]
+satiety_decay_per_min: 3.0
+# Points de satiété rendus par unité de nourriture mangée. [1 ; 100]
+satiety_per_food: 25
+# Un villageois mange quand sa satiété passe sous ce seuil. [1 ; 100]
+eat_below_satiety: 50
+# Vitesse (points/s) à laquelle le moral rejoint sa cible. [0.01 ; 10]
+morale_speed_per_s: 0.5
+# Moral de base de la cible (sans satiété, lit ni sécurité). [0 ; 100]
+morale_base: 10
+# Poids de la satiété (0-1) dans le moral cible. [0 ; 1]
+morale_w_satiety: 0.5
+# Bonus de moral cible pour un villageois qui dispose d'un lit. [0 ; 100]
+morale_bed_bonus: 20
+# Bonus de moral cible quand le village est en sécurité (aucune menace). [0 ; 100]
+morale_security_bonus: 20
+# Malus de moral cible en cas de surpopulation (villageois > lits x ratio). [0 ; 100]
+morale_crowding_penalty: 20
+# Malus de moral cible quand les menaces dépassent ce que les gardes couvrent (insécurité). [0 ; 100]
+morale_insecurity_penalty: 30
+# Vitesse (points/s) à laquelle la loyauté rejoint sa cible. [0.01 ; 10]
+loyalty_speed_per_s: 0.2
+# Bonus de loyauté cible quand le village compte un diplomate. [0 ; 50]
+loyalty_diplomat_bonus: 10
+# Sous ce moral, la loyauté baisse en plus de sa convergence. [0 ; 100]
+loyalty_low_morale: 55
+# Perte de loyauté supplémentaire (points/s) quand le moral est bas. [0 ; 10]
+loyalty_low_morale_decay_per_s: 0.4
+# Sous ce moral, un villageois ne travaille plus (désobéissance). [0 ; 100]
+disobey_morale: 25
+
+# ---- Démographie ----
+# Intervalle minimal (s) entre deux naissances dans un village. [1 ; 86400]
+birth_interval_s: 300
+# Nourriture stockée minimale pour qu'une naissance ait lieu. [0 ; 10000]
+birth_food_threshold: 10
+# Nourriture consommée par naissance. [0 ; 1000]
+birth_food_cost: 4
+# Population maximale d'un village. [1 ; 1000]
+max_population: 40
+
+# ---- Crises ----
+# Durée (s) d'un jour de simulation. [10 ; 86400]
+day_length_s: 1200
+# Nourriture consommée par villageois et par jour (calcul des jours restants). [0.1 ; 100]
+food_per_villager_per_day: 4.0
+# Famine quand les jours de nourriture restants passent sous ce seuil. [0 ; 100]
+famine_days_threshold: 2.0
+# Surpopulation quand villageois > lits x ce ratio. [0.5 ; 10]
+overpopulation_ratio: 1.0
+# Insécurité quand menaces > gardes x cette valeur (sans garde : toute menace). [0.1 ; 100]
+insecurity_threats_per_guard: 2.0
+# Durée (s) d'indicateur de crise soutenu avant la contestation. [1 ; 86400]
+contest_after_s: 120
+# Multiplicateur de la perte de loyauté en contestation. [1 ; 10]
+contest_decay_penalty: 2.0
+# Les villageois dont la loyauté passe sous ce seuil peuvent être exilés. [0 ; 100]
+exile_loyalty: 30
+# Durée (s) de contestation avec loyauté basse avant l'exil. [1 ; 86400]
+exile_after_s: 180
+# Part (0-1) de la nourriture du stock emportée par les exilés. [0 ; 1]
+exile_food_share: 0.3
+# Part (0-1) des exilés qui deviennent gardes du campement. [0 ; 1]
+camp_guard_share: 0.4
+# Part maximale (0-1) de la population qui peut partir en un seul exil (les plus mécontents d'abord) ; un garde reste toujours au village. [0.05 ; 1]
+exile_max_share: 0.5
+# Loyauté ajoutée au seuil d'exil quand les dissidents rentrent au village après une trêve (cause disparue). [0 ; 70]
+reconcile_loyalty_bonus: 20
+# Distance (blocs) entre le village et le campement dissident. [20 ; 1000]
+camp_distance: 80
+# Durée (s) de tension élevée avant que la guerre civile éclate. [1 ; 86400]
+war_after_s: 120
+# Seuil de tension T déclenchant la guerre (voir DESIGN.md). [0 ; 200]
+war_tension: 60
+# Tension ajoutée quand aucun diplomate vivant n'est présent. [0 ; 100]
+war_no_diplomat_penalty: 10
+# Relations (0-100) à atteindre pour qu'une trêve soit signée. [0 ; 100]
+truce_relations: 70
+# Dégâts (PV) d'une frappe de garde pendant la guerre civile, une frappe par seconde. [0.5 ; 100]
+war_damage: 4
+# Vitesse de redescente des minuteurs de crise quand l'indicateur disparaît (s perdues par s). [0.01 ; 10]
+crisis_recovery_factor: 0.25
+
+# ---- Rôles ----
+# Intervalle (s) entre deux actions d'un rôle pour un villageois. [1 ; 3600]
+behavior_interval_s: 10
+# Rayon (blocs) autour du villageois où il travaille. [2 ; 128]
+work_radius: 16
+# Nombre de villageois qui agissent par tick (étale la charge d'une cadence sur plusieurs ticks). [1 ; 1000]
+behaviors_per_tick: 4
+# Relations gagnées à chaque visite réussie du diplomate. [0 ; 100]
+relations_per_visit: 5
+# Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]
+hut_wood: 30
+# Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
+builder_spare_beds: 2
+# Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
+talk_loyalty_bonus: 2
+# Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
+show_role_names: 1
+# Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]
+show_action_bar: 1
