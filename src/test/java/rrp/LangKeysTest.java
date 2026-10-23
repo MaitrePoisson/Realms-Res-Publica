@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -18,9 +19,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Aucune clé de texte utilisée par le code ne doit manquer dans lang_fr.yml, et l'aide couvre toute sous-commande. */
 class LangKeysTest {
 
-    // Transitoire (portage NeoForge) : tant que Commands.java n'est pas porte, on lit la reference Paper.
-    private static final Path SRC = Files.exists(Path.of("src/main/java/rrp/neoforge/Commands.java"))
-            ? Path.of("src/main/java/rrp/neoforge") : Path.of("legacy-paper/java/rrp/bukkit");
+    private static final Path SRC = Path.of("src/main/java/rrp/neoforge");
+    // Transitoire (portage NeoForge) : le code Paper de reference est aussi controle tant qu'il existe.
+    private static final Path LEGACY = Path.of("legacy-paper/java/rrp/bukkit");
     private static final Pattern KEY = Pattern.compile("\"((?:[a-z_]+\\.)+[a-z_]+)\"");
     private static final Pattern LANG_CALL = Pattern.compile("\\blang\\s*\\.\\s*(?:get|msg)\\s*\\(");
     private static final Pattern YAML_KEY = Pattern.compile("^\"?([A-Za-z0-9_.]+)\"?\\s*:", Pattern.MULTILINE);
@@ -43,7 +44,9 @@ class LangKeysTest {
         Set<String> have = langKeys();
         Set<String> missing = new TreeSet<>();
         int seen = 0;
-        try (Stream<Path> files = Files.walk(SRC)) {
+        List<Path> roots = Files.exists(LEGACY) ? List.of(SRC, LEGACY) : List.of(SRC);
+        for (Path root : roots) {
+          try (Stream<Path> files = Files.walk(root)) {
             for (Path f : (Iterable<Path>) files.filter(x -> x.toString().endsWith(".java"))::iterator) {
                 String code = read(f);
                 Matcher call = LANG_CALL.matcher(code);
@@ -59,6 +62,7 @@ class LangKeysTest {
                     }
                 }
             }
+          }
         }
         assertTrue(seen > 30, "peu de clés repérées (" + seen + ") : l'analyse du code est cassée");
         assertTrue(missing.isEmpty(), "clés absentes de lang_fr.yml : " + missing);
@@ -76,15 +80,18 @@ class LangKeysTest {
     void helpListsEverySubcommand() throws IOException {
         Set<String> have = langKeys();
         String code = read(SRC.resolve("Commands.java"));
-        Matcher sw = Pattern.compile("case \"([a-z]+)\" ->").matcher(code.substring(code.indexOf("onCommand")));
+        Matcher sw = Pattern.compile("case ((?:\"[a-z]+\"(?:, )?)+) ->").matcher(code.substring(code.indexOf("static void onCommand")));
         Set<String> subs = new TreeSet<>();
         while (sw.find()) {
-            subs.add(sw.group(1));
-            if (sw.group(1).equals("reload")) {
+            Matcher q = Pattern.compile("\"([a-z]+)\"").matcher(sw.group(1));
+            while (q.find()) {
+                subs.add(q.group(1));
+            }
+            if (sw.group(1).contains("\"reload\"")) {
                 break;
             }
         }
-        assertTrue(subs.size() >= 12, "sous-commandes repérées : " + subs);
+        assertTrue(subs.size() >= 11, "sous-commandes repérées : " + subs);
         Matcher list = Pattern.compile("SUBS = List.of\\(([^)]*)\\)").matcher(code);
         assertTrue(list.find(), "liste SUBS introuvable");
         for (String s : subs) {

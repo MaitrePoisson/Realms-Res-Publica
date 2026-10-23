@@ -16,6 +16,9 @@ cd "$ROOT" || exit 1
     sleep 1
   done
   sleep 3
+  # console commands (the mod's reply must appear in the log)
+  for c in "rrp help" "respublica reload" "rrp bogus" "rrp village list"; do echo "$c"; sleep 2; done
+  sleep 2
   echo stop
   sleep 30
 ) | timeout $((LIMIT + 60)) cmd //c "$(cygpath -w "$ROOT/build/moddev/runServer.cmd")" > "$LOG" 2>&1
@@ -24,4 +27,7 @@ if ! grep -q "Realms & Res Publica activé" "$LOG"; then
 fi
 if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG"; then echo "SERVER: mod error in log"; exit 1; fi
 grep -q "Realms & Res Publica désactivé" "$LOG" || { echo "SERVER: no clean stop"; exit 1; }
-echo "SERVER: mod loaded and stopped cleanly"
+for pat in "Commandes disponibles" "config.yml relu" "Sous-commande inconnue" "pas encore disponible"; do
+  grep -q "$pat" "$LOG" || { echo "SERVER: command reply missing: $pat"; exit 1; }
+done
+echo "SERVER: mod loaded, commands answered, stopped cleanly"
