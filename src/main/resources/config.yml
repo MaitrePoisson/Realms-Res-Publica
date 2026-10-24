@@ -135,6 +135,14 @@ defense_ring_radius: 30
 defense_stone_stock: 80
 # Population minimale avant de remplacer la palissade par des murs de pierre. [0 ; 1000]
 defense_stone_population: 14
+# Rayon d'influence (en chunks) de l'Hotel de Ville d'un village. [1 ; 16]
+territory_hall_radius: 4
+# Rayon d'influence (en chunks) d'un avant-poste, d'un campement ou d'une tour de guet. [1 ; 16]
+territory_outpost_radius: 2
+# Influence minimale pour qu'une faction possede un chunk. [0.01 ; 1]
+territory_owner_threshold: 0.2
+# Ecart d'influence sous lequel un chunk est conteste entre deux factions. [0 ; 1]
+territory_contest_margin: 0.1
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
