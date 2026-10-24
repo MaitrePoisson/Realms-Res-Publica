@@ -4,10 +4,10 @@
 NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.jar` to `mods/`. Solo: open a world with cheats on (integrated server). Dedicated: start the server and give yourself op. The log must print "Realms & Res Publica activé". `/rrp` is an alias of `/respublica`.
 
 ## Commands
-`help`, `status [village]`, `village [list|scan|flush]`, `warehouse set` (look at a barrel), `inspect [uuid]` (look at a villager), `setrole <role> [uuid]` (fermier, forestier, mineur, garde, intendant, batisseur, diplomate), `tick <n>` (accelerated time), `famine|overpopulate|insecurity [village]` (debug crises), `reload`.
+`help`, `townhall [info|set|build]`, `status [village]`, `village [list|scan|flush]`, `warehouse set` (look at a barrel), `inspect [uuid]` (look at a villager), `setrole <role> [uuid]` (fermier, forestier, mineur, garde, intendant, batisseur, diplomate), `tick <n>` (accelerated time), `famine|overpopulate|insecurity [village]` (debug crises), `reload`.
 
 ## Automated checks
-- `bash .athanor/check.sh` (or `./gradlew build` + `bash tools/run_sim.sh`): unit tests, balance simulator, 8 headless GameTests (`runGameTestServer`), and a real NeoForge dedicated server run (create village, roles, births, crises, restart persistence).
+- `bash .athanor/check.sh` (or `./gradlew build` + `bash tools/run_sim.sh`): unit tests, balance simulator, 15 headless GameTests (`runGameTestServer`), and a real NeoForge dedicated server run (create village, roles, births, crises, restart persistence).
 - GameTests alone: `./gradlew runGameTestServer`.
 
 ## Manual checklist
@@ -20,3 +20,13 @@ NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.j
 7. `/respublica overpopulate` and `/respublica insecurity` trigger the other two causes.
 8. Restart the server: villages, gauges and roles are restored (`villages.json`).
 9. Edit a value in `config.yml`, `/respublica reload`: the new value applies.
+10. Urbanism: `/rrp townhall build` at the village centre (or `townhall set` on a gold block under a lectern). Put chests/barrels next to it; foresters, miners and farmers fill them (`/rrp status` shows categories wood/stone/ore/food).
+11. Fill the store with logs and stone (60 wood / 40 stone by default) with at least 6 villagers: `/rrp status` lists build orders, then builders level a spot and raise a house, farm or workshop block by block. Leave and come back: unfinished sites resume.
+12. Roads appear from the Town Hall to each finished building (dirt path), and to nearby villages or camps; with 60+ stone and 8+ villagers they are paved.
+13. At 12+ villagers (or 3+ threats) watchtowers and an oak palisade with gates are built; with 80+ stone and 14+ villagers the palisade is upgraded to stone. Guards stand on towers.
+14. Change the quotas in `config.yml` and `/rrp reload` to see growth speed up or slow down.
+
+## How growth is decided (for testing)
+- The steward orders a building only when the community store holds at least `expansion_wood_quota` wood AND `expansion_stone_quota` stone (after reserving what queued orders will cost), the village has `expansion_population_quota` villagers, and fewer than `max_build_orders` orders are queued. A village with wood but no stone does not grow.
+- Targets: houses when beds < population + `builder_spare_beds`; farms = population/4; workshops = population/6; towers = population/8; wall segments from 12 villagers. The most-needed type that the stock can pay for is ordered.
+- If an order cannot be built (no flat spot, missing plan) it is dropped silently; check `/rrp status` for the queue, buildings and roads. Use `/rrp tick <n>` to speed things up.

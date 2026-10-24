@@ -6,6 +6,10 @@ A NeoForge 1.21.1 mod (Java 21) that turns Minecraft villagers into a living soc
 - **Three gauges per villager**: morale, satiety, loyalty (visible with `/respublica inspect`, saved in the villager's data).
 - **Organic demography**: births depend on the food really stored in the village barrel and on the real number of beds; hunger and overcrowding make villagers leave.
 - **Crises with real causes**: famine, overpopulation, insecurity → contestation → exile (a dissident camp is built) → civil war → truce (reconciliation or autonomy).
+- **Town Hall and community store**: a lectern on a gold block marks the village core (`/rrp townhall set|info|build`). Foresters, miners and farmers deposit wood, stone, ores and crops into chests/barrels next to it; the steward draws from the same store, and a new chest is placed when it is full (`max_chests`).
+- **Autonomous expansion**: once the stock (`expansion_wood_quota`, `expansion_stone_quota`) and population (`expansion_population_quota`) quotas are met, the steward orders a building (house, big house, farm, workshop, tower) from a biome-adaptive pool of generated `.nbt` blueprints. Builders level the terrain and place the blocks row by row, fully on their own; construction resumes after a restart.
+- **Roads**: dirt paths between the Town Hall, buildings and neighbouring villages/camps (`road_link_distance`), paved with cobblestone/stone bricks when stone and population allow (`road_pave_stone_stock`, `road_pave_population`).
+- **Defenses**: watchtowers, an oak palisade then stone walls with gates at road crossings, started by population or threats (`defense_population`, `defense_threats`, `defense_ring_radius`, `defense_stone_stock`, `defense_stone_population`); guards man the towers.
 - All balancing lives in `config.yml`; messages are in French (`lang_fr.yml`).
 
 ## Install

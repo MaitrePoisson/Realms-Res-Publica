@@ -101,6 +101,6 @@ grep -E "tick|P50|P95|ms" "$LOG4" | grep -i -E "average|P50|P95" | tail -n 2
 
 # leave no stray world behind: the GameTest server reads run/server.properties and would load these villages
 sed -i 's/^level-name=.*/level-name=rrp-test-world/' run/server.properties
-rm -rf run/rrp-crisis-world run/rrp-urban-world
+rm -rf run/rrp-test-world run/rrp-crisis-world run/rrp-urban-world
 
 echo "SERVER: mod loaded, commands answered, village + roles survived a restart"

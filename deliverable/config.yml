@@ -105,6 +105,36 @@ behaviors_per_tick: 4
 relations_per_visit: 5
 # Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]
 hut_wood: 30
+# Rayon (blocs) du cœur du village autour de l'Hôtel de Ville. [4 ; 64]
+town_hall_radius: 12
+# Rayon (blocs) autour de l'Hôtel de Ville où coffres et tonneaux forment le stock communautaire. [2 ; 16]
+store_radius: 5
+# Nombre maximal de coffres que les collecteurs ajoutent d'eux-mêmes quand le stock est plein. [1 ; 30]
+max_chests: 6
+# Stock de bois que le village doit avoir avant que l'intendant commande un bâtiment. [0 ; 100000]
+expansion_wood_quota: 60
+# Stock de pierre que le village doit avoir avant que l'intendant commande un bâtiment. [0 ; 100000]
+expansion_stone_quota: 40
+# Population minimale du village avant toute commande de bâtiment. [0 ; 1000]
+expansion_population_quota: 6
+# Nombre maximal d'ordres de construction en attente par village. [1 ; 50]
+max_build_orders: 3
+# Stock de pierre a partir duquel les routes de terre sont pavees (1 pierre pour 2 positions pavees). [0 ; 100000]
+road_pave_stone_stock: 60
+# Population minimale du village avant de paver ses routes. [0 ; 1000]
+road_pave_population: 8
+# Distance maximale (blocs) a laquelle une route relie l'Hotel de Ville a un autre village ou campement. 0 = jamais. [0 ; 1000]
+road_link_distance: 160
+# Population a partir de laquelle le village se fortifie (palissade + tours de guet). [0 ; 1000]
+defense_population: 12
+# Menaces simultanees a partir desquelles le village se fortifie, meme petit. [0 ; 1000]
+defense_threats: 3
+# Rayon (blocs) de l'enceinte autour de l'Hotel de Ville. [4 ; 60]
+defense_ring_radius: 30
+# Stock de pierre a partir duquel la palissade de bois est remplacee par des murs de pierre. [0 ; 100000]
+defense_stone_stock: 80
+# Population minimale avant de remplacer la palissade par des murs de pierre. [0 ; 1000]
+defense_stone_population: 14
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
