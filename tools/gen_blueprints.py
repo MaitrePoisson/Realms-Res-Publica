@@ -1,4 +1,4 @@
-"""Generates the building blueprint pool (7 kinds x 5 biome families) as gzip NBT structure files.
+"""Generates the building blueprint pool (11 kinds x 5 biome families) as gzip NBT structure files.
 Usage: python tools/gen_blueprints.py [output_dir]   (default: src/main/resources/data/respublica/structure)
 Deterministic: same output on every run. Origin y=0 is the floor layer; the door is in the z=0 wall."""
 import gzip, os, struct, sys
@@ -122,10 +122,59 @@ def gate(st):
     b.fill(1, 3, 0, 3, 3, 0, "plank"); b.put(1, 2, 0, "torch"); b.put(3, 2, 0, "torch")
     return b
 
+def market(st):
+    """Open market: plank floor, four stalls with slab roofs, barrels and hay bales on the counters."""
+    b = Bp(9, 5, 7, st)
+    b.fill(0, 0, 0, 8, 0, 6, "plank")
+    for x0 in (1, 6):
+        for z0 in (1, 4):
+            b.fill(x0, 1, z0, x0, 3, z0, "fence"); b.fill(x0 + 1, 1, z0 + 1, x0 + 1, 3, z0 + 1, "fence")
+            b.fill(x0 - 1 if x0 > 1 else x0, 4, z0 - 1 if z0 > 1 else z0, x0 + 2, 4, z0 + 2, "slab")
+            b.put(x0 + 1, 1, z0, "barrel", facing="up"); b.put(x0, 1, z0 + 1, "hay_block", axis="y")
+    b.put(4, 1, 3, "lantern"); b.put(4, 0, 3, "stone")
+    return b
+
+def barracks(st):
+    """Barracks: stone hall with beds along the walls, an anvil and a weapon rack of fences."""
+    b = Bp(11, 6, 7, st)
+    b.fill(0, 0, 0, 10, 0, 6, "stone")
+    b.fill(0, 1, 0, 10, 4, 6, "stone"); b.fill(1, 1, 1, 9, 4, 5, "minecraft:air")
+    b.fill(5, 1, 0, 5, 2, 0, "minecraft:air")
+    for x, z in ((0, 0), (10, 0), (0, 6), (10, 6)):
+        b.fill(x, 1, z, x, 4, z, "log", **({} if st["log"] == "cut_sandstone" else {"axis": "y"}))
+    b.fill(0, 5, 0, 10, 5, 6, "slab")
+    for x in (2, 4, 6, 8):
+        b.put(x, 1, 4, "red_bed", facing="south", part="foot", occupied="false")
+        b.put(x, 1, 5, "red_bed", facing="south", part="head", occupied="false")
+    b.put(1, 1, 1, "anvil", facing="east"); b.put(9, 1, 1, "barrel", facing="up")
+    b.put(3, 2, 6, "glass_pane"); b.put(7, 2, 6, "glass_pane")
+    b.put(5, 3, 1, "torch")
+    return b
+
+def monument(st):
+    """Monument: stepped plinth topped by a column and a lit beacon-like lantern."""
+    b = Bp(7, 10, 7, st)
+    b.fill(0, 0, 0, 6, 0, 6, "stone"); b.fill(1, 1, 1, 5, 1, 5, "stone"); b.fill(2, 2, 2, 4, 2, 4, "stone")
+    b.fill(3, 3, 3, 3, 7, 3, "log", **({} if st["log"] == "cut_sandstone" else {"axis": "y"}))
+    b.put(3, 8, 3, "stone"); b.put(3, 9, 3, "lantern")
+    for x, z in ((0, 0), (6, 0), (0, 6), (6, 6)): b.put(x, 1, z, "torch")
+    return b
+
+def brewery(st):
+    """Alchemy hut: small walled room with a brewing stand, cauldron, barrels and a bookshelf."""
+    b = Bp(5, 5, 5, st)
+    b.fill(0, 0, 0, 4, 0, 4, "plank")
+    b.fill(0, 1, 0, 4, 3, 4, "plank"); b.fill(1, 1, 1, 3, 3, 3, "minecraft:air"); b.fill(2, 1, 0, 2, 2, 0, "minecraft:air")
+    b.fill(0, 4, 0, 4, 4, 4, "slab")
+    b.put(1, 1, 3, "brewing_stand"); b.put(3, 1, 3, "cauldron"); b.put(1, 1, 1, "barrel", facing="up")
+    b.put(3, 1, 1, "bookshelf"); b.put(2, 3, 2, "torch")
+    return b
+
 KINDS = {
     "house": lambda st: hut(st, 7, 7, 4, 2),
     "big_house": lambda st: hut(st, 9, 9, 4, 4),
     "farm": farm, "workshop": workshop, "watchtower": tower, "wall_segment": wall, "gate": gate,
+    "market": market, "barracks": barracks, "monument": monument, "brewery": brewery,
 }
 
 if __name__ == "__main__":

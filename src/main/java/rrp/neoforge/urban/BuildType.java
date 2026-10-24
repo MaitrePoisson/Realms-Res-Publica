@@ -6,7 +6,15 @@ public enum BuildType {
     FARM(20, 0),
     WORKSHOP(40, 20),
     TOWER(20, 40),
-    WALL(10, 30);
+    WALL(10, 30),
+    /** Doctrine marchande. */
+    MARKET(40, 10),
+    /** Doctrine guerrière. */
+    BARRACKS(30, 50),
+    /** Doctrine théocratique. */
+    MONUMENT(20, 80),
+    /** Cabane d'alchimie / brasserie, doctrine théocratique. */
+    BREWERY(30, 10);
 
     private final int wood;
     private final int stone;

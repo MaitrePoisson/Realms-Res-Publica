@@ -547,6 +547,57 @@ public final class RrpGameTests {
     }
 
     @GameTest(template = ARENA, batch = "roads")
+    public static void doctrineBehaviours(GameTestHelper h) {
+        try {
+            rrp.neoforge.ExploitationWatcher.reset();
+            VillageSite site = village(h, 2, 2, 16);
+            ServerLevel level = h.getLevel();
+            rrp.core.SimConfig saved = RrpMod.simConfig();
+            try {
+                RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.TERRITORY_HALL_RADIUS, 8));
+                BlockPos far = h.absolutePos(new BlockPos(320, 2, 12));
+                site.setHall(far.getX(), far.getY(), far.getZ());
+                BlockPos ownerHall = h.absolutePos(new BlockPos(60, 2, 12));
+                VillageSite owner = RrpMod.registry().create(site.worldName(), ownerHall.getX(), ownerHall.getY(), ownerHall.getZ(), 5);
+                owner.setHall(ownerHall.getX(), ownerHall.getY(), ownerHall.getZ());
+                // build priorities differ per doctrine (same situation, same stocks)
+                var situation = new rrp.neoforge.urban.ExpansionPlanner.Situation(16, 16, 500, 500, new int[] {0, 64, 0},
+                        java.util.Map.of(), java.util.List.of());
+                var quotas = new rrp.neoforge.urban.ExpansionPlanner.Quotas(60, 40, 6, 3);
+                var kinds = new java.util.HashSet<rrp.neoforge.urban.BuildType>();
+                for (var d : rrp.core.territory.Doctrine.values()) {
+                    kinds.add(rrp.neoforge.urban.ExpansionPlanner.plan(situation, quotas, 2, d).orElseThrow().type());
+                }
+                h.assertTrue(kinds.size() == 3, "three doctrines, three first buildings: " + kinds);
+                // merchant city never trespasses, empire always does
+                owner.setDoctrine(rrp.core.territory.Doctrine.ISOLATIONIST_THEOCRACY);
+                site.setDoctrine(rrp.core.territory.Doctrine.MERCHANT_CITY);
+                RrpMod.setSimConfig(RrpMod.simConfig().with(rrp.core.SimConfig.Key.TERRITORY_TRESPASS, 1));
+                h.assertTrue(!rrp.neoforge.ExploitationWatcher.aggressive(site, RrpMod.simConfig()), "merchant stays neutral");
+                // theocracy expels strangers standing on its chunks
+                for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+                    v.teleportTo(h.absolutePos(new BlockPos(12, 1, 12)).getX() + 0.5, h.absolutePos(new BlockPos(12, 1, 12)).getY(),
+                            h.absolutePos(new BlockPos(12, 1, 12)).getZ() + 0.5);
+                }
+                int n = rrp.neoforge.ExploitationWatcher.expelStrangers(level, owner, RrpMod.simConfig(), RrpMod.registry());
+                h.assertTrue(n >= 1, "theocracy expelled strangers: " + n);
+                VillageSite empire = RrpMod.registry().create(site.worldName(), ownerHall.getX() + 400, ownerHall.getY(), ownerHall.getZ(), 5);
+                empire.setDoctrine(rrp.core.territory.Doctrine.WARLIKE_EMPIRE);
+                h.assertTrue(rrp.neoforge.ExploitationWatcher.expelStrangers(level, empire, RrpMod.simConfig(), RrpMod.registry()) == 0,
+                        "empire does not expel");
+                h.assertTrue(rrp.neoforge.ExploitationWatcher.aggressive(empire,
+                        RrpMod.simConfig().with(rrp.core.SimConfig.Key.TERRITORY_TRESPASS, 0)), "empire is aggressive by doctrine");
+            } finally {
+                RrpMod.setSimConfig(saved);
+                rrp.neoforge.ExploitationWatcher.reset();
+            }
+            h.succeed();
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    @GameTest(template = ARENA, batch = "roads")
     public static void roads(GameTestHelper h) {
         try {
             roadsBody(h);

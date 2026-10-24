@@ -18,7 +18,8 @@ public final class BlueprintPool {
     /** Les plans disponibles. */
     public enum Kind {
         HOUSE("house"), BIG_HOUSE("big_house"), FARM("farm"), WORKSHOP("workshop"),
-        WATCHTOWER("watchtower"), WALL_SEGMENT("wall_segment"), GATE("gate");
+        WATCHTOWER("watchtower"), WALL_SEGMENT("wall_segment"), GATE("gate"),
+        MARKET("market"), BARRACKS("barracks"), MONUMENT("monument"), BREWERY("brewery");
 
         private final String file;
 
@@ -34,6 +35,10 @@ public final class BlueprintPool {
                 case WORKSHOP -> WORKSHOP;
                 case TOWER -> WATCHTOWER;
                 case WALL -> WALL_SEGMENT;
+                case MARKET -> MARKET;
+                case BARRACKS -> BARRACKS;
+                case MONUMENT -> MONUMENT;
+                case BREWERY -> BREWERY;
             };
         }
     }

@@ -33,6 +33,9 @@ public final class Guard extends RoleBehavior {
 
     @Override
     public boolean runOnce(BehaviorContext ctx) {
+        if (rrp.neoforge.ExploitationWatcher.expelStrangers(ctx.level(), ctx.site(), ctx.config(), ctx.registry()) > 0) {
+            return true;
+        }
         int r = ctx.workRadius();
         int[] post = tower(ctx);
         if (post != null && ctx.villager().distanceToSqr(post[0] + 0.5, post[1], post[2] + 0.5) <= TOWER_REACH * TOWER_REACH) {

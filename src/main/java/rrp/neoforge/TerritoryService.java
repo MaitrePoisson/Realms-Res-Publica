@@ -48,6 +48,9 @@ public final class TerritoryService {
             int bx = s.hasHall() ? s.hall()[0] : (int) Math.floor(s.x());
             int bz = s.hasHall() ? s.hall()[2] : (int) Math.floor(s.z());
             int r = s.state().faction() == Faction.DISSIDENT ? outR : hallR;
+            if (s.doctrine() != null && s.state().faction() != Faction.DISSIDENT) {
+                r = Math.max(1, (int) Math.round(r * s.doctrine().claimRadiusFactor()));
+            }
             map.put(new InfluenceMap.Marker(s.id(), s.id(), ChunkPos.ofBlock(bx, bz), r, 1.0));
             if (s.defense().started()) {
                 for (int[] t : s.defense().towers()) {

@@ -4,6 +4,7 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import rrp.core.territory.Doctrine;
 
 /**
  * Décide si le village s'agrandit : quand les quotas de stock (bois, pierre) ET de population sont atteints,
@@ -23,6 +24,11 @@ public final class ExpansionPlanner {
 
     /** Un ordre à émettre, ou rien si un quota n'est pas atteint, si la file est pleine ou s'il n'y a pas de besoin. */
     public static Optional<BuildOrder> plan(Situation s, Quotas q, int spareBeds) {
+        return plan(s, q, spareBeds, null);
+    }
+
+    /** Idem, avec les bâtiments et les défenses favorisés par la doctrine ({@code null} = neutre). */
+    public static Optional<BuildOrder> plan(Situation s, Quotas q, int spareBeds, Doctrine doctrine) {
         if (s.hall() == null || s.queued().size() >= q.maxOrders() || s.population() < q.population()) {
             return Optional.empty();
         }
@@ -41,12 +47,13 @@ public final class ExpansionPlanner {
             return Optional.empty();
         }
         BuildType best = null;
-        int bestNeed = 0;
+        int bestScore = 0;
         for (BuildType t : BuildType.values()) {
-            int need = target(t, s, spareBeds) - have.getOrDefault(t, 0);
-            if (need > bestNeed && wood >= t.wood() && stone >= t.stone()) {
+            int need = target(t, s, spareBeds, doctrine) - have.getOrDefault(t, 0);
+            int score = need > 0 && preferred(doctrine, t) ? need + 100 : need;
+            if (score > bestScore && need > 0 && wood >= t.wood() && stone >= t.stone()) {
                 best = t;
-                bestNeed = need;
+                bestScore = score;
             }
         }
         if (best == null) {
@@ -59,13 +66,34 @@ public final class ExpansionPlanner {
 
     /** Nombre de bâtiments souhaités de ce type (déjà construits ou commandés compris) pour cette population. */
     static int target(BuildType t, Situation s, int spareBeds) {
+        return target(t, s, spareBeds, null);
+    }
+
+    /** Bâtiments que la doctrine passe avant tous les autres tant qu'il en manque. */
+    static boolean preferred(Doctrine d, BuildType t) {
+        if (d == null) {
+            return false;
+        }
+        return switch (d) {
+            case MERCHANT_CITY -> t == BuildType.MARKET;
+            case WARLIKE_EMPIRE -> t == BuildType.BARRACKS;
+            case ISOLATIONIST_THEOCRACY -> t == BuildType.MONUMENT || t == BuildType.BREWERY;
+        };
+    }
+
+    static int target(BuildType t, Situation s, int spareBeds, Doctrine d) {
         int pop = s.population();
+        double wallPriority = d == null ? 1.0 : d.wallPriority();
         return switch (t) {
             case HOUSE -> Math.max(0, pop + spareBeds - s.beds()) + built(s, BuildType.HOUSE);
             case FARM -> pop / 4;
             case WORKSHOP -> pop / 6;
-            case TOWER -> pop / 8;
-            case WALL -> pop >= 12 ? 4 : 0;
+            case TOWER -> (int) Math.round(pop / 8.0 * wallPriority);
+            case WALL -> pop >= Math.round(12 / wallPriority) ? 4 : 0;
+            case MARKET -> d == Doctrine.MERCHANT_CITY ? Math.max(1, pop / 5) : 0;
+            case BARRACKS -> d == Doctrine.WARLIKE_EMPIRE ? Math.max(1, pop / 8) : 0;
+            case MONUMENT -> d == Doctrine.ISOLATIONIST_THEOCRACY && pop >= 10 ? 1 : 0;
+            case BREWERY -> d == Doctrine.ISOLATIONIST_THEOCRACY ? Math.max(1, pop / 10) : 0;
         };
     }
 

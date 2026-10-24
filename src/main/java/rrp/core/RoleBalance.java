@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import rrp.core.territory.Doctrine;
 
 /**
  * Répartition déterministe des rôles dans un village : un indice (la profession vanilla) est suivi
@@ -44,17 +45,28 @@ public final class RoleBalance {
      * population, au moins un villageois), sinon le rôle le moins représenté.
      */
     public static Role choose(Map<Role, Integer> counts, int population, Role hint) {
-        int cap = Math.max(1, (int) Math.ceil(population / 3.0));
-        if (hint != null && counts.getOrDefault(hint, 0) < cap) {
+        return choose(counts, population, hint, null);
+    }
+
+    /**
+     * Comme {@link #choose(Map, int, Role)}, avec les poids de rôle de la doctrine : un rôle favorisé a un plafond
+     * plus haut et passe pour moins représenté ; un rôle délaissé l'inverse. Sans doctrine, tous les poids valent 1.
+     */
+    public static Role choose(Map<Role, Integer> counts, int population, Role hint, Doctrine doctrine) {
+        if (hint != null && counts.getOrDefault(hint, 0) < Math.max(1, (int) Math.ceil(population / 3.0 * weight(doctrine, hint)))) {
             return hint;
         }
         Role best = PRIORITY.get(0);
         for (Role r : PRIORITY) {
-            if (counts.getOrDefault(r, 0) < counts.getOrDefault(best, 0)) {
+            if (counts.getOrDefault(r, 0) / weight(doctrine, r) < counts.getOrDefault(best, 0) / weight(doctrine, best)) {
                 best = r;
             }
         }
         return best;
+    }
+
+    private static double weight(Doctrine doctrine, Role role) {
+        return doctrine == null ? 1.0 : doctrine.roleWeight(role);
     }
 
     /**

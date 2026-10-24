@@ -82,4 +82,16 @@ class RoleBalanceTest {
         assignAll(9, Role.FORESTER).forEach(v -> b.add(v.role()));
         assertEquals(a, b);
     }
+
+    @Test
+    void doctrineWeightsShiftTheRoleMix() {
+        var merchant = rrp.core.territory.Doctrine.MERCHANT_CITY;
+        var empire = rrp.core.territory.Doctrine.WARLIKE_EMPIRE;
+        var counts = new java.util.EnumMap<Role, Integer>(Role.class);
+        for (Role r : Role.values()) counts.put(r, 1);
+        assertEquals(Role.DIPLOMAT, RoleBalance.choose(counts, 9, null, merchant));
+        assertEquals(Role.GUARD, RoleBalance.choose(counts, 9, null, empire));
+        assertEquals(Role.DIPLOMAT, RoleBalance.choose(counts, 9, Role.DIPLOMAT, merchant));
+        assertEquals(Role.FARMER, RoleBalance.choose(counts, 9, null, null));
+    }
 }

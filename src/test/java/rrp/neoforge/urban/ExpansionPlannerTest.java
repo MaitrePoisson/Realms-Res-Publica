@@ -63,4 +63,21 @@ class ExpansionPlannerTest {
         assertTrue(Math.hypot(a[0] - HALL[0], a[2] - HALL[2]) >= 13);
         assertTrue(a[0] != b[0] || a[2] != b[2]);
     }
+
+    @Test
+    void doctrinesPickDifferentFirstBuildings() {
+        var s = sit(16, 16, 500, 500, Map.of(), List.of());
+        var merchant = ExpansionPlanner.plan(s, Q, 2, rrp.core.territory.Doctrine.MERCHANT_CITY).orElseThrow().type();
+        var empire = ExpansionPlanner.plan(s, Q, 2, rrp.core.territory.Doctrine.WARLIKE_EMPIRE).orElseThrow().type();
+        var theocracy = ExpansionPlanner.plan(s, Q, 2, rrp.core.territory.Doctrine.ISOLATIONIST_THEOCRACY).orElseThrow().type();
+        assertEquals(BuildType.MARKET, merchant);
+        assertEquals(BuildType.BARRACKS, empire);
+        assertEquals(BuildType.MONUMENT, theocracy);
+    }
+
+    @Test
+    void neutralPlanIgnoresDoctrineBuildings() {
+        var o = ExpansionPlanner.plan(sit(16, 16, 500, 500, Map.of(), List.of()), Q, 2).orElseThrow();
+        assertTrue(o.type() != BuildType.MARKET && o.type() != BuildType.BARRACKS && o.type() != BuildType.MONUMENT);
+    }
 }

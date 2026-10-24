@@ -36,11 +36,17 @@ public final class RoleAssigner {
      * @param hints indice de rôle de chaque nouvel arrivant, dans le même ordre que {@code fresh}
      */
     public static void assign(List<VillagerState> existing, List<VillagerState> fresh, List<Role> hints) {
+        assign(existing, fresh, hints, null);
+    }
+
+    /** Idem, avec les poids de rôle de la doctrine du village ({@code null} = neutre). */
+    public static void assign(List<VillagerState> existing, List<VillagerState> fresh, List<Role> hints,
+                              rrp.core.territory.Doctrine doctrine) {
         List<VillagerState> all = new ArrayList<>(existing);
         int population = existing.size() + fresh.size();
         for (int i = 0; i < fresh.size(); i++) {
             VillagerState v = fresh.get(i);
-            v.setRole(RoleBalance.choose(RoleBalance.count(all), population, hints.get(i)));
+            v.setRole(RoleBalance.choose(RoleBalance.count(all), population, hints.get(i), doctrine));
             all.add(v);
         }
         RoleBalance.ensureEssentials(all, fresh);

@@ -135,7 +135,7 @@ public final class VillagerAdapter {
             }
         }
         next.addAll(restored);
-        RoleAssigner.assign(next, fresh, hints);
+        RoleAssigner.assign(next, fresh, hints, site.doctrine());
         next.addAll(fresh);
         for (int i = 0; i < newcomers.size(); i++) {
             write(newcomers.get(i), fresh.get(i));
