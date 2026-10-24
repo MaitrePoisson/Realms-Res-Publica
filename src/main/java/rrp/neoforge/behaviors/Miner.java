@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import rrp.core.Role;
+import rrp.neoforge.ExploitationWatcher;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +38,7 @@ public final class Miner extends RoleBehavior {
         Level level = ctx.level();
         List<BlockPos> targets = new ArrayList<>(nearby(ctx, 6, 3, Miner::isOre).stream().filter(p -> isExposed(level, p)).toList());
         targets.addAll(nearby(ctx, 2, 3, s -> NATURAL_STONE.contains(s.getBlock())).stream().filter(p -> isExposed(level, p)).toList());
+        targets = new ArrayList<>(ExploitationWatcher.filter(ctx, targets));
         ItemStack pickaxe = new ItemStack(Items.IRON_PICKAXE);
         int done = 0;
         for (BlockPos pos : targets) {
@@ -54,6 +56,7 @@ public final class Miner extends RoleBehavior {
                 store(ctx, drop, pos);
             }
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
+            ExploitationWatcher.worked(ctx, pos);
             done++;
         }
         return done > 0;

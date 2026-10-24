@@ -10,6 +10,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import rrp.core.Role;
+import rrp.neoforge.ExploitationWatcher;
 
 import java.util.List;
 
@@ -34,6 +35,7 @@ public final class Forester extends RoleBehavior {
         for (int i = 0; i < MAX_PER_RUN; i++) {
             List<BlockPos> logs = nearby(ctx, 2, 12, Forester::isLog).stream()
                     .filter(p -> isTreeTrunk(level, p)).toList();
+            logs = ExploitationWatcher.filter(ctx, logs);
             if (logs.isEmpty()) {
                 break;
             }
@@ -52,6 +54,7 @@ public final class Forester extends RoleBehavior {
             if (level.getBlockState(log.below()).is(BlockTags.DIRT)) {
                 level.setBlock(log, sapling(kind), Block.UPDATE_CLIENTS);
             }
+            ExploitationWatcher.worked(ctx, log);
             done++;
         }
         return done > 0;

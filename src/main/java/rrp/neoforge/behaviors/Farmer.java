@@ -6,6 +6,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CropBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import rrp.core.Role;
+import rrp.neoforge.ExploitationWatcher;
 
 import java.util.List;
 
@@ -25,7 +26,7 @@ public final class Farmer extends RoleBehavior {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
-        List<BlockPos> ripe = nearby(ctx, 3, 3, Farmer::isRipe);
+        List<BlockPos> ripe = ExploitationWatcher.filter(ctx, nearby(ctx, 3, 3, Farmer::isRipe));
         int done = 0;
         for (BlockPos pos : ripe) {
             if (done >= MAX_PER_RUN) {
@@ -39,6 +40,7 @@ public final class Farmer extends RoleBehavior {
                 store(ctx, drop, pos);
             }
             ctx.level().setBlock(pos, ((CropBlock) state.getBlock()).getStateForAge(0), Block.UPDATE_CLIENTS);
+            ExploitationWatcher.worked(ctx, pos);
             done++;
         }
         return done > 0;

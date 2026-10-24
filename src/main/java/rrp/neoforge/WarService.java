@@ -78,6 +78,7 @@ public final class WarService {
         accumulated = 0;
         for (int i = 0; i < rounds; i++) {
             round();
+            borderRound();
         }
     }
 
@@ -105,6 +106,22 @@ public final class WarService {
         }
     }
 
+    /** Guerre de frontière : les gardes de deux villages voisins s'affrontent tant que la provocation reste au sommet. */
+    void borderRound() {
+        for (String[] pair : ExploitationWatcher.borderWars()) {
+            VillageSite owner = registry.get(pair[0]);
+            VillageSite intruder = registry.get(pair[1]);
+            if (owner == null || intruder == null || !owner.worldName().equals(intruder.worldName())) {
+                continue;
+            }
+            ServerLevel world = Worlds.level(server.get(), owner.worldName());
+            if (world == null || !WarehouseService.loaded(owner, world) || !WarehouseService.loaded(intruder, world)) {
+                continue;
+            }
+            fight(world, owner, intruder, false);
+        }
+    }
+
     private VillageSite campOf(VillageSite village) {
         for (VillageSite s : registry.all()) {
             if (s.state().faction() == Faction.DISSIDENT && village.id().equals(s.state().parentId())
@@ -126,6 +143,10 @@ public final class WarService {
     }
 
     private void fight(ServerLevel world, VillageSite village, VillageSite camp) {
+        fight(world, village, camp, true);
+    }
+
+    private void fight(ServerLevel world, VillageSite village, VillageSite camp, boolean clamp) {
         float damage = (float) config.get().get(SimConfig.Key.WAR_DAMAGE);
         boolean death = false;
         for (boolean villageSide : new boolean[] {true, false}) {
@@ -138,7 +159,7 @@ public final class WarService {
                     break;
                 }
                 if (g.distanceTo(target) > REACH) {
-                    approach(world, g, target, camp, villageSide);
+                    approach(world, g, target, clamp ? camp : null, villageSide);
                 }
                 if (g.distanceTo(target) <= REACH) {
                     float before = target.getHealth();
@@ -190,6 +211,11 @@ public final class WarService {
         double step = Math.min(STEP, Math.max(0, dist - 1.0));
         double nx = g.getX() + dx / dist * step;
         double nz = g.getZ() + dz / dist * step;
+        if (camp == null) {
+            world.getChunk((int) Math.floor(nx) >> 4, (int) Math.floor(nz) >> 4);
+            g.teleportTo(nx, world.getHeight(Heightmap.Types.MOTION_BLOCKING, (int) Math.floor(nx), (int) Math.floor(nz)), nz);
+            return;
+        }
         double cx = nx - camp.x();
         double cz = nz - camp.z();
         double fromCamp = Math.hypot(cx, cz);

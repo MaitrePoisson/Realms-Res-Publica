@@ -64,6 +64,11 @@ public final class RrpMod {
     public static WarService war() { return war; }
     public static Persistence persistence() { return persistence; }
 
+    /** Remplace la configuration en mémoire (tests). */
+    public static void setSimConfig(SimConfig c) {
+        simConfig = c;
+    }
+
     public static SimConfig simConfig() {
         return simConfig;
     }
@@ -105,6 +110,7 @@ public final class RrpMod {
         behaviors.onTicks(t);
         crises.onTicks(t);
         war.onTicks(t);
+        ExploitationWatcher.onTicks(t, simConfig);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };
 

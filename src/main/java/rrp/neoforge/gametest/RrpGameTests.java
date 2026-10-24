@@ -487,6 +487,65 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "territory")
+    public static void exploitation(GameTestHelper h) {
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            exploitationBody(h);
+        } finally {
+            RrpMod.setSimConfig(saved);
+            rrp.neoforge.ExploitationWatcher.reset();
+            wipeTown(h);
+        }
+    }
+
+    private static void exploitationBody(GameTestHelper h) {
+        rrp.neoforge.ExploitationWatcher.reset();
+        VillageSite site = village(h, 2, 2, 16);
+        ServerLevel level = h.getLevel();
+        level.setDayTime(6000);
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.TERRITORY_HALL_RADIUS, 8)
+                .with(rrp.core.SimConfig.Key.PROVOCATION_WARN, 2).with(rrp.core.SimConfig.Key.PROVOCATION_EXPEL, 4)
+                .with(rrp.core.SimConfig.Key.PROVOCATION_WAR, 4));
+        // intruder's hall is far away; a neighbour owns the arena's chunk
+        BlockPos far = h.absolutePos(new BlockPos(320, 2, 12));
+        site.setHall(far.getX(), far.getY(), far.getZ());
+        BlockPos ownerHall = h.absolutePos(new BlockPos(60, 2, 12));
+        VillageSite owner = RrpMod.registry().create(site.worldName(), ownerHall.getX(), ownerHall.getY(), ownerHall.getZ(), 5);
+        owner.setHall(ownerHall.getX(), ownerHall.getY(), ownerHall.getZ());
+        var map = rrp.neoforge.TerritoryService.build(RrpMod.registry().all(), site.worldName(), RrpMod.simConfig());
+        BlockPos wheat = new BlockPos(12, 1, 12);
+        h.assertTrue(owner.id().equals(map.owner(rrp.core.territory.ChunkPos.ofBlock(
+                h.absolutePos(wheat).getX(), h.absolutePos(wheat).getZ()))), "neighbour owns the arena chunk");
+        h.setBlock(new BlockPos(12, 0, 12), Blocks.FARMLAND);
+        h.setBlock(wheat, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+        setAll(h, Role.FARMER);
+        // 1. peaceful doctrine: the farmer avoids the foreign chunk
+        h.assertTrue(!act(h, site), "farmer worked in a foreign chunk");
+        h.assertTrue(h.getBlockState(wheat).getValue(CropBlock.AGE) == 7, "wheat untouched");
+        h.assertTrue(rrp.neoforge.ExploitationWatcher.provocation(RrpMod.simConfig()).score(owner.id(), site.id()) == 0,
+                "no provocation without trespass");
+        // 2. aggressive: it works there and the owner's provocation climbs to a border war
+        RrpMod.setSimConfig(RrpMod.simConfig().with(rrp.core.SimConfig.Key.TERRITORY_TRESPASS, 1));
+        for (int i = 0; i < 8; i++) {
+            h.setBlock(wheat, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+            act(h, site);
+        }
+        var prov = rrp.neoforge.ExploitationWatcher.provocation(RrpMod.simConfig());
+        h.assertTrue(prov.score(owner.id(), site.id()) >= 4, "provocation raised: " + prov.score(owner.id(), site.id()));
+        h.assertTrue(prov.stage(owner.id(), site.id()) == rrp.core.territory.Provocation.Stage.WAR, "stage war");
+        h.assertTrue(rrp.neoforge.ExploitationWatcher.atWar(owner.id(), site.id()), "border war declared");
+        // 3. expulsion: the owner's guards send the intruder's villagers on its land back home
+        for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+            v.teleportTo(h.absolutePos(wheat).getX() + 0.5, h.absolutePos(wheat).getY(), h.absolutePos(wheat).getZ() + 0.5);
+        }
+        int n = rrp.neoforge.ExploitationWatcher.expel(level, owner, site, RrpMod.simConfig(), RrpMod.registry());
+        h.assertTrue(n >= 1, "villagers expelled: " + n);
+        h.assertTrue(level.getEntitiesOfClass(Villager.class, h.getBounds()).isEmpty(), "arena emptied by the expulsion");
+        h.succeed();
+    }
+
     @GameTest(template = ARENA, batch = "roads")
     public static void roads(GameTestHelper h) {
         try {

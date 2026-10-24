@@ -143,6 +143,18 @@ territory_outpost_radius: 2
 territory_owner_threshold: 0.2
 # Ecart d'influence sous lequel un chunk est conteste entre deux factions. [0 ; 1]
 territory_contest_margin: 0.1
+# Les villageois travaillent aussi dans les chunks d'un voisin (1 = oui, 0 = ils les evitent). [0 ; 1]
+territory_trespass: 0
+# Provocation ajoutee a chaque action de travail dans un chunk voisin. [0 ; 100]
+provocation_per_act: 1
+# Provocation a partir de laquelle le proprietaire avertit l'intrus. [0 ; 1000]
+provocation_warn: 3
+# Provocation a partir de laquelle les gardes du proprietaire expulsent les intrus. [0 ; 1000]
+provocation_expel: 6
+# Provocation a partir de laquelle une guerre de frontiere eclate. [0 ; 1000]
+provocation_war: 10
+# Provocation perdue par seconde. [0 ; 10]
+provocation_decay_s: 0.02
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
