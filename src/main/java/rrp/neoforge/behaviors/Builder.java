@@ -66,9 +66,12 @@ public final class Builder extends RoleBehavior {
         if (ctx.site().hasWarehouse() && (ctx.site().construction() != null || !ctx.site().orders().isEmpty())) {
             return false;
         }
-        if (!ctx.site().hasWarehouse() || ctx.site().state().beds()
-                >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
+        if (!ctx.site().hasWarehouse()) {
             return false;
+        }
+        if (ctx.site().state().beds()
+                >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
+            return workOnBorders(ctx);
         }
         int cost = (int) ctx.config().get(SimConfig.Key.HUT_WOOD);
         if (ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.WOOD, 0) < cost) {
@@ -288,6 +291,18 @@ public final class Builder extends RoleBehavior {
             return true;
         }
         return false;
+    }
+
+    /** Pose les bornes frontières manquantes du territoire du village (une par action, sans matériaux). */
+    private boolean workOnBorders(BehaviorContext ctx) {
+        var site = ctx.site();
+        var map = rrp.neoforge.TerritoryService.build(ctx.registry().all(), site.worldName(), ctx.config());
+        int[] p = rrp.neoforge.TerritoryService.nextMissing(ctx.level(), map, site.id());
+        if (p == null) {
+            return false;
+        }
+        walkToward(ctx, new BlockPos(p[0], site.hall()[1], p[1]));
+        return rrp.neoforge.TerritoryService.placePost(ctx.level(), p[0], p[1], site.id());
     }
 
     private static boolean canPave(BehaviorContext ctx) {

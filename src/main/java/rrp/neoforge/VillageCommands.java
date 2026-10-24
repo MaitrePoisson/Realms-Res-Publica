@@ -29,6 +29,7 @@ final class VillageCommands {
         Commands.register("warehouse", VillageCommands::warehouse);
         Commands.register("townhall", VillageCommands::townHall);
         Commands.register("status", VillageCommands::status);
+        Commands.register("territory", VillageCommands::territory);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -202,6 +203,22 @@ final class VillageCommands {
             }
         }
         return best;
+    }
+
+    private static void territory(CommandSourceStack src, String[] args) {
+        Lang lang = RrpMod.lang();
+        Vec3 pos = src.getPosition();
+        String world = Worlds.name(src.getLevel());
+        var map = TerritoryService.build(world);
+        var order = RrpMod.registry().all().stream().filter(s -> s.worldName().equals(world)).map(VillageSite::id).toList();
+        var center = rrp.core.territory.ChunkPos.ofBlock((int) Math.floor(pos.x), (int) Math.floor(pos.z));
+        Commands.reply(src, lang.msg("territory.header", center.x(), center.z()));
+        TerritoryService.ascii(map, center, 8, order).forEach(r -> Commands.reply(src, r));
+        StringBuilder legend = new StringBuilder();
+        for (int i = 0; i < order.size(); i++) {
+            legend.append((char) ('A' + i % 26)).append('=').append(order.get(i)).append(' ');
+        }
+        Commands.reply(src, lang.get("territory.legend", legend.toString().trim()));
     }
 
     private static void status(CommandSourceStack src, String[] args) {

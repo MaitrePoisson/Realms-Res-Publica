@@ -449,6 +449,44 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "territory")
+    public static void territory(GameTestHelper h) {
+        try {
+            territoryBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void territoryBody(GameTestHelper h) {
+        VillageSite site = village(h, 4, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(12, 2, 12));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        var map = rrp.neoforge.TerritoryService.build(RrpMod.registry().all(), site.worldName(), RrpMod.simConfig());
+        var chunk = rrp.core.territory.ChunkPos.ofBlock(hall.getX(), hall.getZ());
+        h.assertTrue(site.id().equals(map.owner(chunk)), "hall chunk claimed by its village");
+        h.assertTrue(map.owner(new rrp.core.territory.ChunkPos(chunk.x() + 20, chunk.z())) == null, "far chunk is free");
+        var posts = rrp.neoforge.TerritoryService.posts(map, site.id());
+        h.assertTrue(!posts.isEmpty(), "border posts planned");
+        // a builder places posts one by one until none is missing for the chunks around the arena
+        setAll(h, Role.BUILDER);
+        site.state().setBeds(20);
+        BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.OAK_PLANKS, 1));
+        RrpMod.warehouse().refresh(site, level);
+        var builder = RrpMod.adapter().present(site, level).get(0);
+        int[] first = rrp.neoforge.TerritoryService.nextMissing(level, map, site.id());
+        h.assertTrue(first != null, "posts missing at start");
+        RrpMod.behaviors().runOnce(site, level, builder);
+        h.assertTrue(rrp.neoforge.TerritoryService.isMarked(level, first[0], first[1]), "first post placed");
+        int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, first[0], first[1]);
+        h.assertTrue(level.getBlockState(new BlockPos(first[0], y - 1, first[1])).getBlock() instanceof net.minecraft.world.level.block.BannerBlock,
+                "banner on top of the post");
+        h.succeed();
+    }
+
     @GameTest(template = ARENA, batch = "roads")
     public static void roads(GameTestHelper h) {
         try {
