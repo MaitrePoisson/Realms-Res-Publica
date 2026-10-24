@@ -132,6 +132,7 @@ public final class WarehouseService {
 
     /** Si le village a un Hôtel de Ville mais pas d'entrepôt, pose un tonneau à côté et le désigne. */
     public void ensureForHall(VillageSite site, ServerLevel level) {
+        TerritoryService.ensureDoctrine(level, site);
         if (level == null || !site.hasHall() || site.hasWarehouse()) {
             return;
         }

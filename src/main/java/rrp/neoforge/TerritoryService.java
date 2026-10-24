@@ -11,6 +11,7 @@ import rrp.core.Faction;
 import rrp.core.SimConfig;
 import rrp.core.territory.BorderPlan;
 import rrp.core.territory.ChunkPos;
+import rrp.core.territory.DoctrineSelector;
 import rrp.core.territory.InfluenceMap;
 
 /**
@@ -56,6 +57,27 @@ public final class TerritoryService {
             }
         }
         return map;
+    }
+
+    /**
+     * Fixe la doctrine du village d'après les biomes échantillonnés autour de l'Hôtel de Ville
+     * (grille de 9x9 points sur 2 x {@code village_radius}). Sans effet si elle est déjà choisie.
+     */
+    public static void ensureDoctrine(ServerLevel level, VillageSite site) {
+        if (level == null || site.doctrine() != null || !site.hasHall()) {
+            return;
+        }
+        int[] h = site.hall();
+        int r = Math.min(RrpMod.simConfig().getInt(SimConfig.Key.VILLAGE_RADIUS), 96);
+        List<String> paths = new java.util.ArrayList<>();
+        for (int i = -4; i <= 4; i++) {
+            for (int j = -4; j <= 4; j++) {
+                BlockPos p = new BlockPos(h[0] + i * r / 4, h[1], h[2] + j * r / 4);
+                paths.add(level.getBiome(p).unwrapKey().map(k -> k.location().getPath()).orElse(""));
+            }
+        }
+        site.setDoctrine(DoctrineSelector.select(paths));
+        RrpMod.registry().markDirty();
     }
 
     public static InfluenceMap build(String world) {

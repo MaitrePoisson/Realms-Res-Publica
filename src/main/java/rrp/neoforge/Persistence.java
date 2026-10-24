@@ -150,6 +150,9 @@ public final class Persistence {
             a.add(h[2]);
             o.add("hall", a);
         }
+        if (s.doctrine() != null) {
+            o.addProperty("doctrine", s.doctrine().name());
+        }
         if (!s.orders().isEmpty()) {
             JsonArray oa = new JsonArray();
             for (BuildOrder b : s.orders()) {
@@ -273,6 +276,13 @@ public final class Persistence {
         if (o.has("hall")) {
             JsonArray a = o.getAsJsonArray("hall");
             s.setHall(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
+        }
+        if (o.has("doctrine")) {
+            try {
+                s.setDoctrine(rrp.core.territory.Doctrine.valueOf(o.get("doctrine").getAsString()));
+            } catch (IllegalArgumentException ignored) {
+                // doctrine inconnue : sera recalculée
+            }
         }
         if (o.has("orders")) {
             for (JsonElement e : o.getAsJsonArray("orders")) {

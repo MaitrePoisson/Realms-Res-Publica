@@ -26,6 +26,8 @@ public final class VillageSite {
     private int[] warehouse;
     /** Coordonnées du bloc d'or de l'Hôtel de Ville, ou {@code null} tant qu'il n'existe pas. */
     private int[] hall;
+    /** Doctrine fixée à la fondation de l'Hôtel de Ville, ou {@code null} tant qu'elle n'est pas choisie. */
+    private rrp.core.territory.Doctrine doctrine;
     /** Ordres de construction en attente (émis par l'intendant), dans l'ordre. */
     private final List<BuildOrder> orders = new ArrayList<>();
     /** Chantier en cours (un seul à la fois), ou {@code null}. */
@@ -70,6 +72,15 @@ public final class VillageSite {
 
     public void setHall(int bx, int by, int bz) {
         this.hall = new int[] {bx, by, bz};
+    }
+
+    public rrp.core.territory.Doctrine doctrine() { return doctrine; }
+
+    /** Fixe la doctrine une seule fois : un appel ultérieur est ignoré. */
+    public void setDoctrine(rrp.core.territory.Doctrine d) {
+        if (doctrine == null) {
+            doctrine = d;
+        }
     }
 
     public List<BuildOrder> orders() { return orders; }
