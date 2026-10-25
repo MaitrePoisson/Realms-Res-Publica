@@ -67,6 +67,12 @@ public final class VillageSite {
         this.warehouse = new int[] {bx, by, bz};
     }
 
+    private String owner;
+
+    /** UUID (text) of the player ruling this village, or null when it is autonomous. */
+    public String owner() { return owner; }
+    public void setOwner(String uuid) { this.owner = uuid; }
+
     public int[] hall() { return hall == null ? null : hall.clone(); }
     public boolean hasHall() { return hall != null; }
 

@@ -36,6 +36,7 @@ class PersistenceTest {
         s.state().setRelations(30);
         s.setWarehouse(3, 64, -7);
         s.setHall(1, 65, -2);
+        s.setOwner("abc");
         s.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.TOWER, 9, 64, -8));
         s.built().put(rrp.neoforge.urban.BuildType.FARM, 2);
         VillageSite camp = reg.create("minecraft:overworld", 100, 70, 100, 16, Faction.DISSIDENT);
@@ -46,6 +47,7 @@ class PersistenceTest {
         assertEquals(2, persistence(back).load());
         VillageSite r = back.get(s.id());
         assertNotNull(r);
+        assertEquals("abc", r.owner());
         assertEquals(5, r.state().beds());
         assertEquals(CrisisLevel.CONTESTATION, r.state().level());
         assertEquals(42, r.state().stock(Resource.FOOD));

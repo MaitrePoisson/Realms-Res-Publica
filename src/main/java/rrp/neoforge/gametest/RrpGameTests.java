@@ -1044,4 +1044,31 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void sovereignfounding(GameTestHelper h) {
+        reset();
+        rrp.neoforge.PlayerService.ledger().clear();
+        var player = h.makeMockServerPlayerInLevel();
+        java.util.UUID id = player.getUUID();
+        ServerLevel level = h.getLevel();
+        BlockPos base = h.absolutePos(new BlockPos(6, 2, 6));
+        rrp.neoforge.TownHall.build(level, base);
+        h.assertTrue(rrp.neoforge.SovereignService.found(player, level, base) == rrp.core.player.Founding.Verdict.NOT_SOVEREIGN,
+                "an observer cannot found");
+        rrp.neoforge.PlayerService.ledger().switchRole(id, rrp.core.player.PlayerRole.SOVEREIGN, 0, 0);
+        h.assertTrue(rrp.neoforge.SovereignService.found(player, level, base) == rrp.core.player.Founding.Verdict.TOO_POOR,
+                "founding costs emeralds");
+        rrp.neoforge.PlayerService.ledger().deposit(id, 20);
+        h.assertTrue(rrp.neoforge.SovereignService.found(player, level, base) == rrp.core.player.Founding.Verdict.OK, "founded");
+        VillageSite v = rrp.neoforge.SovereignService.ownedBy(id).stream().findFirst().orElse(null);
+        h.assertTrue(v != null && id.toString().equals(v.owner()), "the player owns the new village");
+        h.assertTrue(v.hasHall(), "the Town Hall is registered");
+        h.assertTrue(rrp.neoforge.PlayerService.ledger().purse(id) == 15, "cost paid from the purse");
+        BlockPos far = base.offset(10, 0, 0);
+        h.assertTrue(rrp.neoforge.SovereignService.found(player, level, far) == rrp.core.player.Founding.Verdict.TOO_CLOSE,
+                "min distance enforced");
+        rrp.neoforge.PlayerService.ledger().clear();
+        h.succeed();
+    }
 }

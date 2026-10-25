@@ -348,6 +348,9 @@ final class VillageCommands {
         }
         VillageState st = site.state();
         Commands.reply(src, lang.msg("status.header", site.id(), st.faction().label(), st.level().label()));
+        if (site.owner() != null) {
+            Commands.reply(src, lang.get("status.owner", site.owner()));
+        }
         Commands.reply(src, lang.get("status.people", st.population(), st.beds(), site.radius()));
         double satiety = st.villagers().stream().mapToDouble(VillagerState::satiety).average().orElse(0);
         Commands.reply(src, lang.get("status.gauges", Math.round(st.averageMorale()), Math.round(satiety),

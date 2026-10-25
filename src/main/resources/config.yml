@@ -259,6 +259,12 @@ builder_spare_beds: 2
 talk_loyalty_bonus: 2
 # Delai (s) avant qu'un joueur puisse changer de role (revenir a Observateur est toujours libre). [0 ; 1000000]
 role_switch_cooldown_s: 300
+# Cout (emeraudes de la bourse) pour fonder un village en tant que Souverain. [0 ; 100000]
+found_cost: 5
+# Distance minimale (blocs) entre un nouveau village de joueur et un village existant. [0 ; 100000]
+found_min_distance: 96
+# Nombre maximal de villages diriges par un meme Souverain. [0 ; 100]
+found_max_per_player: 1
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]
