@@ -771,6 +771,47 @@ public final class RrpGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void diplomacy(GameTestHelper h) {
+        VillageSite a = village(h, 2, 2, 10);
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.DIPLOMACY_INTERVAL_S, 0)
+                    .with(rrp.core.SimConfig.Key.CARAVAN_INTERVAL_S, 0));
+            rrp.neoforge.DiplomacyService.reset();
+            var cfg = RrpMod.simConfig();
+            VillageSite b = RrpMod.registry().create(a.worldName(), a.x() + 40, a.y(), a.z(), 5);
+            VillageSite c = RrpMod.registry().create(a.worldName(), a.x(), a.y(), a.z() + 40, 5);
+            for (VillageSite s : new VillageSite[] {a, b, c}) {
+                s.state().setStock(Resource.FOOD, 100);
+            }
+            rrp.neoforge.RelationService.change(a, b, 100, cfg);
+            rrp.neoforge.RelationService.change(a, c, -100, cfg);
+            rrp.neoforge.RelationService.change(b, c, -100, cfg);
+            rrp.neoforge.DiplomacyService.evaluate(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.DEFENSIVE_ALLIANCE,
+                    "alliance against the common enemy");
+            h.assertTrue(rrp.neoforge.DiplomacyService.pending().isEmpty(), "no war while fed");
+            c.state().setStock(Resource.FOOD, 0);
+            rrp.neoforge.DiplomacyService.evaluate(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.pending().size() == 2, "ultimatums announced");
+            h.assertTrue(rrp.neoforge.DiplomacyService.calm(a, c, cfg), "a diplomat cancels the declaration");
+            h.assertTrue(rrp.neoforge.DiplomacyService.pending().size() == 1, "the other one stands");
+            rrp.neoforge.DiplomacyService.evaluate(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.pending().size() == 2, "declared again");
+            RrpMod.ticks().advance((long) (cfg.get(rrp.core.SimConfig.Key.DIPLOMACY_WAR_DELAY_S) * 20) + 20);
+            h.assertTrue(rrp.neoforge.DiplomacyService.atWar(c.id(), a.id()), "war opened with a");
+            h.assertTrue(rrp.neoforge.DiplomacyService.atWar(c.id(), b.id()), "ally joined the war");
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.DEFENSIVE_ALLIANCE,
+                    "alliance kept");
+        } finally {
+            rrp.neoforge.DiplomacyService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void caravan(GameTestHelper h) {
         VillageSite a = village(h, 2, 2, 10);
         ServerLevel level = h.getLevel();

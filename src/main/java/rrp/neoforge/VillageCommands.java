@@ -31,6 +31,7 @@ final class VillageCommands {
         Commands.register("status", VillageCommands::status);
         Commands.register("territory", VillageCommands::territory);
         Commands.register("caravan", VillageCommands::caravan);
+        Commands.register("diplomacy", VillageCommands::diplomacy);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -251,6 +252,25 @@ final class VillageCommands {
         }
         var stage = rrp.neoforge.ExploitationWatcher.incident(src.getLevel(), owner, intruder, RrpMod.simConfig(), RrpMod.registry());
         Commands.reply(src, RrpMod.lang().msg("territory.incident", owner.id(), intruder.id(), stage.name()));
+    }
+
+    /** {@code diplomacy [evaluate]} : états diplomatiques des couples ; {@code evaluate} force une évaluation. */
+    private static void diplomacy(CommandSourceStack src, String[] args) {
+        var lang = RrpMod.lang();
+        if (args.length >= 2 && args[1].equals("evaluate")) {
+            DiplomacyService.evaluate(RrpMod.simConfig(), RrpMod.registry());
+        }
+        var states = DiplomacyService.treaties().snapshot();
+        if (states.isEmpty() && DiplomacyService.pending().isEmpty()) {
+            Commands.reply(src, lang.msg("diplomacy.none"));
+        }
+        states.forEach((k, v) -> {
+            String[] p = k.split("\\|", 2);
+            Commands.reply(src, lang.msg("diplomacy.line", p[0], p[1], v.name()));
+        });
+        for (var w : DiplomacyService.pending()) {
+            Commands.reply(src, lang.msg("diplomacy.pending", w.aggressor(), w.defender(), Math.round(w.remaining())));
+        }
     }
 
     /** {@code caravan <village> <village>} : envoie une caravane si un troc est possible (diagnostic). */

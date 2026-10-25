@@ -114,7 +114,7 @@ public final class CaravanService {
             for (VillageSite b : all) {
                 if (a.id().compareTo(b.id()) < 0 && a.worldName().equals(b.worldName())
                         && RelationService.index(a, b, cfg) >= cfg.get(SimConfig.Key.RELATION_TRADE_AT)
-                        && !busy(a.id(), b.id())) {
+                        && !DiplomacyService.atWar(a.id(), b.id()) && !busy(a.id(), b.id())) {
                     dispatch(a, b, cfg);
                 }
             }

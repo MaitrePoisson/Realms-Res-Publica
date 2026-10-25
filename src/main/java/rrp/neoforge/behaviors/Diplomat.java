@@ -26,6 +26,7 @@ public final class Diplomat extends RoleBehavior {
             var stance = rrp.neoforge.RelationService.stance(ctx.site(), neighbour, ctx.config());
             double gain = ctx.config().get(SimConfig.Key.RELATIONS_PER_VISIT) * stance.visitMultiplier();
             rrp.neoforge.RelationService.change(ctx.site(), neighbour, gain, ctx.config());
+            rrp.neoforge.DiplomacyService.calm(ctx.site(), neighbour, ctx.config());
             walkToward(ctx, BlockPos.containing(neighbour.x(), neighbour.y(), neighbour.z()));
             ctx.site().state().setRelations(ctx.site().state().relations() + gain);
             neighbour.state().setRelations(neighbour.state().relations() + gain);

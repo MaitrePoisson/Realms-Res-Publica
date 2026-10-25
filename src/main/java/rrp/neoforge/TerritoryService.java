@@ -76,6 +76,7 @@ public final class TerritoryService {
         for (int i = -4; i <= 4; i++) {
             for (int j = -4; j <= 4; j++) {
                 BlockPos p = new BlockPos(h[0] + i * r / 4, h[1], h[2] + j * r / 4);
+                level.getChunk(p.getX() >> 4, p.getZ() >> 4); // un chunk non chargé renverrait le biome du générateur
                 paths.add(level.getBiome(p).unwrapKey().map(k -> k.location().getPath()).orElse(""));
             }
         }

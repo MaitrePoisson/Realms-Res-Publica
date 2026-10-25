@@ -185,6 +185,18 @@ caravan_timeout_s: 180
 caravan_relation_gain: 8
 # Indice relationnel perdu par une caravane perdue. [0 ; 100]
 caravan_relation_loss: 10
+# Secondes entre deux evaluations diplomatiques (traites, alliances, declarations) (0 = jamais). [0 ; 100000]
+diplomacy_interval_s: 30
+# Indice a partir duquel une alliance defensive est possible contre un ennemi commun. [0 ; 100]
+diplomacy_alliance_at: 60
+# Incidents de frontiere entre deux villes qui declenchent une declaration de guerre. [1 ; 1000]
+diplomacy_war_incidents: 3
+# Delai (secondes) entre l'annonce d'une guerre et son ouverture ; un diplomate peut l'annuler. [0 ; 100000]
+diplomacy_war_delay_s: 30
+# Indice gagne quand un diplomate calme un conflit annonce. [0 ; 100]
+diplomacy_calm_gain: 25
+# Stock de vivres sous lequel une ville est en penurie critique. [0 ; 100000]
+diplomacy_critical_food: 10
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
