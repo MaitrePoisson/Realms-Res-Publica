@@ -110,6 +110,7 @@ public final class RrpMod {
         behaviors.onTicks(t);
         crises.onTicks(t);
         war.onTicks(t);
+        RelationService.onTicks(t, simConfig, REGISTRY);
         ExploitationWatcher.onTicks(t, simConfig);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };

@@ -155,6 +155,18 @@ provocation_expel: 6
 provocation_war: 10
 # Provocation perdue par seconde. [0 ; 10]
 provocation_decay_s: 0.02
+# Indice relationnel de depart entre deux villes de doctrines amies (cites marchandes). [0 ; 100]
+relation_base_trade: 40
+# Indice relationnel de depart entre deux villes de doctrines ennemies. [-100 ; 0]
+relation_base_hostile: -40
+# Indice a partir duquel deux villes sont partenaires commerciales. [0 ; 100]
+relation_trade_at: 30
+# Indice en dessous duquel deux villes sont hostiles. [-100 ; 0]
+relation_hostile_at: -30
+# Indice perdu a chaque incident de frontiere. [0 ; 100]
+relation_incident_penalty: 15
+# Retour de l'indice vers sa base, par seconde. [0 ; 10]
+relation_decay_s: 0.05
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

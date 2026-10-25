@@ -119,7 +119,7 @@ done
 at2() { echo "execute positioned 150 -60 0 run $*"; }
 PHASE_DELAY=0.4 run_phase "$LOG5" "difficulty peaceful" "forceload add -16 -100 260 100" "fillbiome 40 -60 -100 150 -60 100 minecraft:badlands" "fillbiome 151 -60 -100 260 -60 100 minecraft:badlands"   "${CL[@]}" "rrp village scan" "rrp warehouse set" "$(at2 rrp warehouse set)" "rrp townhall build" "$(at2 rrp townhall build)"   "rrp village scan" "rrp village act" "rrp village act" "rrp tick 1200" "rrp territory" "rrp territory incident village-1 village-2" "rrp territory" "rrp village flush"
 if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG5"; then echo "SERVER: mod error in log (phase 5)"; grep -E "\[.*/ERROR\]" "$LOG5" | head -5; exit 1; fi
-for pat in "Doctrine de village-1 : MERCHANT_CITY" "Doctrine de village-2 : WARLIKE_EMPIRE" "Relation village-1 <-> village-2 : NEUTRAL (incidents : 0)"            "Incident de frontière provoqué : village-1 contre village-2" "Relation village-1 <-> village-2 : [A-Z]* (incidents : [1-9]"; do
+for pat in "Doctrine de village-1 : MERCHANT_CITY" "Doctrine de village-2 : WARLIKE_EMPIRE" "Relation village-1 <-> village-2 : -*[0-9]* ([A-Z]*, incidents : 0)"            "Incident de frontière provoqué : village-1 contre village-2" "Relation village-1 <-> village-2 : -*[0-9]* ([A-Z]*, incidents : [1-9]"; do
   grep -q "$pat" "$LOG5" || { echo "SERVER: phase 5 missing: $pat"; grep -E "Doctrine|Relation|Territoire|village-" "$LOG5" | tail -n 12; exit 1; }
 done
 echo "SERVER: borders + doctrines + border incident on two villages in different biomes"

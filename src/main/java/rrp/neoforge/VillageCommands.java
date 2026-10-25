@@ -232,8 +232,10 @@ final class VillageCommands {
                 VillageSite a = sites.get(i);
                 VillageSite b = sites.get(j);
                 int n = rrp.neoforge.ExploitationWatcher.incidents(a.id(), b.id());
+                var cfg = RrpMod.simConfig();
                 Commands.reply(src, lang.msg("territory.relation", a.id(), b.id(),
-                        rrp.core.territory.FactionRelations.stance(a.doctrine(), b.doctrine(), n).name(), n));
+                        rrp.neoforge.RelationService.stance(a, b, cfg).name(), n,
+                        Math.round(rrp.neoforge.RelationService.index(a, b, cfg))));
             }
         }
     }

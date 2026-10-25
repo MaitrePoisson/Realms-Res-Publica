@@ -73,6 +73,15 @@ public final class Persistence {
             arr.add(toJson(s));
         }
         root.add("villages", arr);
+        JsonArray rel = new JsonArray();
+        RelationService.matrix().snapshot().forEach((k, v) -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("pair", k);
+            r.addProperty("value", v[0]);
+            r.addProperty("baseline", v[1]);
+            rel.add(r);
+        });
+        root.add("relations", rel);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(FILE + ".tmp");
@@ -90,6 +99,7 @@ public final class Persistence {
     /** Recharge le fichier dans le registre (le remplace). Renvoie le nombre de villages lus. */
     public int load() {
         registry.clear();
+        RelationService.matrix().clear();
         registry.consumeDirty();
         if (!Files.isRegularFile(file)) {
             return 0;
@@ -98,6 +108,13 @@ public final class Persistence {
         boolean problem = false;
         try {
             JsonObject root = JsonParser.parseString(Files.readString(file, StandardCharsets.UTF_8)).getAsJsonObject();
+            if (root.has("relations")) {
+                for (JsonElement e : root.getAsJsonArray("relations")) {
+                    JsonObject r = e.getAsJsonObject();
+                    RelationService.matrix().restore(r.get("pair").getAsString(), r.get("value").getAsDouble(),
+                            r.get("baseline").getAsDouble());
+                }
+            }
             for (JsonElement e : root.getAsJsonArray("villages")) {
                 try {
                     registry.restore(fromJson(e.getAsJsonObject()));
