@@ -29,6 +29,8 @@ run_phase() {
     echo stop
     sleep 30
   ) | timeout $((LIMIT + 120)) cmd //c "$(cygpath -w "$ROOT/build/moddev/runServer.cmd")" > "$out" 2>&1
+  # A server that did not stop in time stays alive after the timeout and keeps the port: stop it before the next phase.
+  powershell -NoProfile -File "$(cygpath -w "$ROOT/tools/kill_stale_server.ps1")" -Root "$(cygpath -w "$ROOT")" > /dev/null 2>&1
 }
 
 run_phase "$LOG" "rrp help" "respublica reload" "rrp bogus" "rrp famine" "rrp village list" \

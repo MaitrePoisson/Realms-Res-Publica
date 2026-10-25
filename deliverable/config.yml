@@ -345,5 +345,25 @@ market_relation_gain: 2
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]
 show_action_bar: 1
+# Physical logistics: units a villager can carry at once (32 = half a stack). [1 ; 64]
+carry_capacity: 32
+# Physical logistics: maximum distance (blocks) between a villager and a chest/barrel to take or store items. [0.5 ; 6]
+chest_reach: 2.0
+# Physical logistics: shortest rummage at the chest, in ticks (20 = 1 s). [5 ; 200]
+rummage_min_ticks: 20
+# Physical logistics: longest rummage at the chest, in ticks (40 = 2 s). [5 ; 400]
+rummage_max_ticks: 40
+# Active wait: seconds between two checks of an empty chest. [1 ; 3600]
+wait_retry_s: 10
+# Guards withdraw behind their comrades when their health falls to this percentage or below. [1 ; 90]
+guard_retreat_pct: 25
+# Distance (blocks) from which guard archers shoot. [8 ; 64]
+guard_ranged_range: 24
+# A creeper closer than this (blocks) is the top priority threat. [4 ; 64]
+guard_creeper_alert: 16
+# Distance (blocks) behind the enemy where the flanking guard goes. [2 ; 16]
+guard_flank_distance: 4
+# Number of hostiles from which two guards pin the enemy and a third flanks. [2 ; 20]
+guard_encircle_min: 3
 # Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
 biome_overrides: ""

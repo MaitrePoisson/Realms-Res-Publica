@@ -185,7 +185,18 @@ public final class SimConfig {
         MARKET_WINDOW_S(1200, 1, 1000000),
         MARKET_RELATION_GAIN(2, 0, 100),
         SHOW_ROLE_NAMES(1, 0, 1),
-        SHOW_ACTION_BAR(1, 0, 1);
+        SHOW_ACTION_BAR(1, 0, 1),
+        // Physical logistics and martial guard AI
+        CARRY_CAPACITY(32, 1, 64),
+        CHEST_REACH(2.0, 0.5, 6),
+        RUMMAGE_MIN_TICKS(20, 5, 200),
+        RUMMAGE_MAX_TICKS(40, 5, 400),
+        WAIT_RETRY_S(10, 1, 3600),
+        GUARD_RETREAT_PCT(25, 1, 90),
+        GUARD_RANGED_RANGE(24, 8, 64),
+        GUARD_CREEPER_ALERT(16, 4, 64),
+        GUARD_FLANK_DISTANCE(4, 2, 16),
+        GUARD_ENCIRCLE_MIN(3, 2, 20);
 
         private final double def;
         private final double min;
