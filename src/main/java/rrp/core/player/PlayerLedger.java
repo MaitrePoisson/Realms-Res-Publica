@@ -34,6 +34,9 @@ public final class PlayerLedger {
 
     /** Switches role; going back to OBSERVER is never subject to the cooldown. */
     public Switch switchRole(UUID id, PlayerRole to, double nowSec, double cooldownSec) {
+        if (to == null) {
+            return Switch.SAME;
+        }
         Profile p = of(id);
         if (p.role == to) {
             return Switch.SAME;

@@ -73,9 +73,9 @@ public final class WarehouseService {
         return level.getBlockEntity(new BlockPos(w[0], w[1], w[2])) instanceof BarrelBlockEntity b ? b : null;
     }
 
-    /** Vrai si le chunk du centre (et celui de l'entrepôt) est chargé : sinon rien n'y est observable. */
+    /** True if the village is physically simulated: ACTIVE level of detail and its hall and warehouse chunks loaded. */
     public static boolean loaded(VillageSite site, ServerLevel level) {
-        if (level == null || !level.hasChunk((int) Math.floor(site.x()) >> 4, (int) Math.floor(site.z()) >> 4)) {
+        if (level == null || site.isAbstract() || !level.hasChunk((int) Math.floor(site.x()) >> 4, (int) Math.floor(site.z()) >> 4)) {
             return false;
         }
         int[] w = site.warehouse();

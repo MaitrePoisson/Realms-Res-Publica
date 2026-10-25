@@ -248,7 +248,7 @@ public final class ContractService {
             VillageSite camp = registry.get(c.target());
             noteOrigin(c, registry);
             if (camp == null || raidersLeft(camp) == 0) {
-                finish(c, c.kills() > 0);
+                finish(c, c.kills() >= campKills(c, cfg));
             }
             return;
         }
@@ -259,7 +259,7 @@ public final class ContractService {
             boolean mine = r.winner().equals(c.issuer()) && r.loser().equals(c.target());
             boolean lost = r.winner().equals(c.target()) && r.loser().equals(c.issuer());
             if (mine || lost) {
-                if (mine && c.kills() > 0) {
+                if (mine && c.kills() >= cfg.get(SimConfig.Key.CONTRACT_WAR_KILLS)) {
                     finish(c, true);
                 } else if (mine) {
                     book().cancel(c.id()); // won without the mercenary lifting a finger: nobody is paid, nobody blamed
@@ -284,6 +284,12 @@ public final class ContractService {
             book().cancel(c.id());
             tellMerc(c, "contract.cancelled", c.id());
         }
+    }
+
+    /** Kills a camp contract demands: half the raiders it was priced for, at least one. */
+    static int campKills(Contract c, SimConfig cfg) {
+        double raiders = (c.pay() - cfg.get(SimConfig.Key.CONTRACT_PAY_BASE)) / Math.max(1, cfg.get(SimConfig.Key.CONTRACT_PAY_PER_RAIDER));
+        return Math.max(1, (int) Math.ceil(raiders / 2));
     }
 
     /** Raiders of the camp still standing: living entities, or unknown ones in unloaded land. */

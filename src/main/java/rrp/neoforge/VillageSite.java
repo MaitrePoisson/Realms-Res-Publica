@@ -20,6 +20,11 @@ public final class VillageSite {
     private final double y;
     private final double z;
     private int radius;
+    /** Level of detail (not persisted: recomputed by the ActivityTracker after a restart). */
+    private rrp.core.abstractsim.Lod lod = rrp.core.abstractsim.Lod.ACTIVE;
+    private long lodInactiveTicks;
+    /** Debug/test override of the level of detail, or null for automatic. */
+    private rrp.core.abstractsim.Lod lodForced;
     /** Rayon d'appartenance élargi pendant une guerre civile (non persisté). */
     private int warReach;
     /** Coordonnées du tonneau-entrepôt, ou {@code null} tant qu'aucun n'est désigné. */
@@ -47,6 +52,14 @@ public final class VillageSite {
         this.z = z;
         this.radius = radius;
     }
+
+    public rrp.core.abstractsim.Lod lod() { return lod; }
+    public void setLod(rrp.core.abstractsim.Lod lod) { this.lod = lod; }
+    public long lodInactiveTicks() { return lodInactiveTicks; }
+    public void setLodInactiveTicks(long t) { this.lodInactiveTicks = t; }
+    public rrp.core.abstractsim.Lod lodForced() { return lodForced; }
+    public void setLodForced(rrp.core.abstractsim.Lod l) { this.lodForced = l; }
+    public boolean isAbstract() { return lod == rrp.core.abstractsim.Lod.ABSTRACT; }
 
     public VillageState state() { return state; }
     public String id() { return state.id(); }

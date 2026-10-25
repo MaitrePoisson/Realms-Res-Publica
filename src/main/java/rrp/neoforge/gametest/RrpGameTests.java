@@ -1262,6 +1262,9 @@ public final class RrpGameTests {
             var w = book.live(a.id(), rrp.core.player.Contract.Type.WAR_ATTACK, b.id());
             rrp.neoforge.ContractService.accept(merc, w.id(), cfg);
             rrp.neoforge.ContractService.onKill(merc.getUUID(), foe);
+            UUID foe2 = UUID.randomUUID();
+            b.state().villagers().add(new rrp.core.VillagerState(foe2, Role.GUARD, b.id()));
+            rrp.neoforge.ContractService.onKill(merc.getUUID(), foe2);
             rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.PEACE);
             rrp.neoforge.WarResolution.record(new rrp.neoforge.WarResolution.Result(a.id(), b.id(), rrp.core.diplomacy.WarOutcome.Kind.PILLAGE, 0));
             rrp.neoforge.ContractService.update(3, cfg, RrpMod.registry());
@@ -1344,6 +1347,37 @@ public final class RrpGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void lodswitch(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        try {
+            h.assertTrue(a.lod() == rrp.core.abstractsim.Lod.ACTIVE && WarehouseService.loaded(a, level), "new village is active");
+            a.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            RrpMod.activity().evaluate(a, 0);
+            h.assertTrue(a.isAbstract() && !WarehouseService.loaded(a, level), "abstract village is not physically simulated");
+            long before = RrpMod.behaviors().actions();
+            RrpMod.behaviors().resetClock();
+            RrpMod.ticks().advance(12000);
+            h.assertTrue(RrpMod.behaviors().actions() == before, "no physical role action in an abstract village");
+            a.setLodForced(null);
+            // automatic mode: a hall in an unloaded chunk turns abstract after the grace period, then wakes up at once
+            VillageSite far = RrpMod.registry().create(a.worldName(), 900000, 70, 900000, 5);
+            RrpMod.activity().evaluate(far, 1);
+            h.assertTrue(far.lod() == rrp.core.abstractsim.Lod.ACTIVE, "grace period not over yet");
+            RrpMod.activity().evaluate(far, 100000);
+            h.assertTrue(far.isAbstract(), "unloaded village turned abstract");
+            far.setLodForced(rrp.core.abstractsim.Lod.ACTIVE);
+            RrpMod.activity().evaluate(far, 0);
+            h.assertTrue(far.lod() == rrp.core.abstractsim.Lod.ACTIVE, "forced active wakes it up");
+            RrpMod.registry().remove(far.id());
+        } finally {
+            a.setLodForced(null);
+            a.setLod(rrp.core.abstractsim.Lod.ACTIVE);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void politicalmap(GameTestHelper h) {
         VillageSite a = village(h, 4, 4, 10);
         ServerLevel level = h.getLevel();
@@ -1413,6 +1447,19 @@ public final class RrpGameTests {
             h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(ruler, a, b, rrp.core.player.Proposals.Kind.CEASEFIRE, cfg)
                     == rrp.neoforge.DiplomaticRegister.Result.ACCEPTED, "ceasefire accepted");
             h.assertTrue(!rrp.neoforge.DiplomacyService.atWar(a.id(), b.id()), "war ended");
+            // real emissaries cost purse emeralds and need a cooldown
+            rrp.neoforge.DiplomaticRegister.resetCooldowns();
+            rrp.neoforge.PlayerService.ledger().withdraw(ruler.getUUID(), rrp.neoforge.PlayerService.ledger().purse(ruler.getUUID()));
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.send(ruler, a, b, rrp.core.player.Proposals.Kind.TRADE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.NO_FUNDS, "an emissary needs emeralds");
+            rrp.neoforge.PlayerService.ledger().deposit(ruler.getUUID(), 10);
+            rrp.neoforge.RelationService.change(a, b, 60 - rrp.neoforge.RelationService.index(a, b, cfg), cfg);
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.send(ruler, a, b, rrp.core.player.Proposals.Kind.TRADE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.ACCEPTED, "paid emissary arrives");
+            h.assertTrue(rrp.neoforge.PlayerService.ledger().purse(ruler.getUUID()) == 8, "emissary cost charged");
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.send(ruler, a, b, rrp.core.player.Proposals.Kind.ALLIANCE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.COOLDOWN, "second emissary must wait");
+            h.assertTrue(!rrp.neoforge.DiplomaticRegister.lines(ruler, cfg, 2).isEmpty(), "register pages never come back empty");
         } finally {
             rrp.neoforge.DiplomacyService.reset();
             reset();

@@ -47,15 +47,51 @@ public final class DiplomaticRegister {
                 Commands.reply(src, lang.msg("register.usage"));
                 return;
             }
-            Commands.reply(src, lang.msg("register.answer." + propose(p, from, to, kind, RrpMod.simConfig()).name().toLowerCase(Locale.ROOT),
+            Commands.reply(src, lang.msg("register.answer." + send(p, from, to, kind, RrpMod.simConfig()).name().toLowerCase(Locale.ROOT),
                     from.id(), to.id(), lang.get("register.kind." + kind.name().toLowerCase(Locale.ROOT))));
             return;
         }
-        show(src, p, RrpMod.simConfig());
+        int page = 1;
+        if (args.length > 1) {
+            try {
+                page = Math.max(1, Integer.parseInt(args[1]));
+            } catch (NumberFormatException e) {
+                page = 1;
+            }
+        }
+        for (Component c : lines(p, RrpMod.simConfig(), page)) {
+            src.sendSuccess(() -> c, false);
+        }
     }
 
     /** Outcome of an emissary, for the command and the tests. */
-    public enum Result { ACCEPTED, REFUSED, INVALID, NOT_RULER, UNKNOWN_VILLAGE }
+    public enum Result { ACCEPTED, REFUSED, INVALID, NOT_RULER, UNKNOWN_VILLAGE, COOLDOWN, NO_FUNDS }
+
+    private static final java.util.Map<java.util.UUID, Double> LAST_SENT = new java.util.HashMap<>();
+
+    public static void resetCooldowns() {
+        LAST_SENT.clear();
+    }
+
+    /** An emissary for a real player: costs purse emeralds and respects a cooldown, then {@link #propose}. */
+    public static Result send(ServerPlayer p, VillageSite from, VillageSite to, Kind kind, SimConfig cfg) {
+        double now = p.serverLevel().getGameTime() / 20.0;
+        Double last = LAST_SENT.get(p.getUUID());
+        if (last != null && now - last < cfg.get(SimConfig.Key.EMISSARY_COOLDOWN_S)) {
+            return Result.COOLDOWN;
+        }
+        long cost = Math.round(cfg.get(SimConfig.Key.EMISSARY_COST));
+        if (PlayerService.ledger().purse(p.getUUID()) < cost) {
+            return Result.NO_FUNDS;
+        }
+        Result r = propose(p, from, to, kind, cfg);
+        if (r == Result.ACCEPTED || r == Result.REFUSED) { // the emissary walked: paid and tired either way
+            PlayerService.ledger().withdraw(p.getUUID(), cost);
+            LAST_SENT.put(p.getUUID(), now);
+            RrpMod.registry().markDirty();
+        }
+        return r;
+    }
 
     /** The ruler's emissary goes from {@code from} to {@code to}; the target answers and the answer is applied. */
     public static Result propose(ServerPlayer p, VillageSite from, VillageSite to, Kind kind, SimConfig cfg) {
@@ -91,6 +127,11 @@ public final class DiplomaticRegister {
 
     /** Lines of the register for a player, buttons included when they rule a village. */
     public static List<Component> lines(ServerPlayer p, SimConfig cfg) {
+        return lines(p, cfg, 1);
+    }
+
+    /** One page of the register ({@code MAX_LINES} lines per page). */
+    public static List<Component> lines(ServerPlayer p, SimConfig cfg, int page) {
         Lang lang = RrpMod.lang();
         String world = Worlds.name(p.serverLevel());
         List<VillageSite> sites = new ArrayList<>(RrpMod.registry().all());
@@ -124,10 +165,11 @@ public final class DiplomaticRegister {
         for (DiplomacyService.Pending pe : DiplomacyService.pending()) {
             out.add(Component.literal(lang.get("register.pending", pe.aggressor(), pe.defender(), Math.round(pe.remaining()))));
         }
-        if (out.size() > MAX_LINES) {
-            int hidden = out.size() - MAX_LINES;
-            out = new ArrayList<>(out.subList(0, MAX_LINES));
-            out.add(Component.literal(lang.get("register.more", hidden)));
+        int pages = Math.max(1, (out.size() + MAX_LINES - 1) / MAX_LINES);
+        int pg = Math.min(Math.max(1, page), pages);
+        if (pages > 1) {
+            out = new ArrayList<>(out.subList((pg - 1) * MAX_LINES, Math.min(out.size(), pg * MAX_LINES)));
+            out.add(Component.literal(lang.get("register.more", pg, pages, pg % pages + 1)));
         }
         return out;
     }
@@ -161,9 +203,4 @@ public final class DiplomaticRegister {
         return String.format(Locale.ROOT, "%+.0f", v);
     }
 
-    private static void show(CommandSourceStack src, ServerPlayer p, SimConfig cfg) {
-        for (Component c : lines(p, cfg)) {
-            src.sendSuccess(() -> c, false);
-        }
-    }
 }

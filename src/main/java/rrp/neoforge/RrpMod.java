@@ -36,6 +36,7 @@ public final class RrpMod {
     private static VillagerAdapter adapter;
     private static VillageScanner scanner;
     private static GaugeTicker gauges;
+    private static ActivityTracker activity;
     private static BirthService births;
     private static ActionBarService actionBar;
     private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
@@ -53,6 +54,8 @@ public final class RrpMod {
         ContractService.install();
         MarketService.install();
         DiplomaticRegister.install();
+        ProbeDriver.install();
+        LodCommands.install();
         LOG.info("Realms & Res Publica chargé");
     }
 
@@ -63,6 +66,7 @@ public final class RrpMod {
     public static VillagerAdapter adapter() { return adapter; }
     public static VillageScanner scanner() { return scanner; }
     public static GaugeTicker gauges() { return gauges; }
+    public static ActivityTracker activity() { return activity; }
     public static BirthService births() { return births; }
     public static ActionBarService actionBar() { return actionBar; }
     public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
@@ -95,6 +99,7 @@ public final class RrpMod {
         server = event.getServer();
         adapter = new VillagerAdapter(RrpMod::simConfig, RrpMod::server, REGISTRY);
         scanner = new VillageScanner(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
+        activity = new ActivityTracker(RrpMod::simConfig, RrpMod::server, REGISTRY);
         gauges = new GaugeTicker(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         births = new BirthService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
         actionBar = new ActionBarService(RrpMod::simConfig, RrpMod::server, REGISTRY, RrpMod::lang);
@@ -110,6 +115,7 @@ public final class RrpMod {
     /** Minuteur du mod : tout ce qui avance avec le temps passe par ici (tick réel ou accéléré). */
     private static final java.util.function.LongConsumer worldTimer = t -> {
         scanner.onTicks(t);
+        activity.onTicks(t);
         gauges.onTicks(t);
         actionBar.onTicks(t);
         births.onTicks(t);
