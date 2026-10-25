@@ -47,6 +47,7 @@ public final class RrpMod {
         RrpAttachments.REGISTER.register(modBus);
         VillageCommands.install();
         CrisisCommands.install();
+        PlayerCommands.install();
         LOG.info("Realms & Res Publica chargé");
     }
 

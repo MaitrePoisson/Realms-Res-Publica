@@ -142,6 +142,7 @@ public final class SimConfig {
         WAR_PEACE_GAIN(30, 0, 200),
         BUILDER_SPARE_BEDS(2, 0, 20),
         TALK_LOYALTY_BONUS(2, 0, 50),
+        ROLE_SWITCH_COOLDOWN_S(300, 0, 1000000),
         SHOW_ROLE_NAMES(1, 0, 1),
         SHOW_ACTION_BAR(1, 0, 1);
 

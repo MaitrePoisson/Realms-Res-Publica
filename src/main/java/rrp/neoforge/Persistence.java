@@ -98,6 +98,16 @@ public final class Persistence {
             tri.add(r);
         });
         root.add("tributaries", tri);
+        JsonArray pl = new JsonArray();
+        PlayerService.ledger().snapshot().forEach((k, v) -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("id", k.toString());
+            r.addProperty("role", ((rrp.core.player.PlayerRole) v[0]).name());
+            r.addProperty("lastSwitch", (double) v[1]);
+            r.addProperty("purse", (long) v[2]);
+            pl.add(r);
+        });
+        root.add("players", pl);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(FILE + ".tmp");
@@ -118,6 +128,7 @@ public final class Persistence {
         RelationService.matrix().clear();
         DiplomacyService.treaties().clear();
         WarResolution.clearTributaries();
+        PlayerService.ledger().clear();
         registry.consumeDirty();
         if (!Files.isRegularFile(file)) {
             return 0;
@@ -144,6 +155,19 @@ public final class Persistence {
                 for (JsonElement e : root.getAsJsonArray("tributaries")) {
                     JsonObject r = e.getAsJsonObject();
                     WarResolution.restore(r.get("loser").getAsString(), r.get("winner").getAsString());
+                }
+            }
+            if (root.has("players")) {
+                for (JsonElement e : root.getAsJsonArray("players")) {
+                    try {
+                        JsonObject r = e.getAsJsonObject();
+                        PlayerService.ledger().restore(java.util.UUID.fromString(r.get("id").getAsString()),
+                                rrp.core.player.PlayerRole.valueOf(r.get("role").getAsString()),
+                                r.get("lastSwitch").getAsDouble(), r.get("purse").getAsLong());
+                    } catch (RuntimeException ex) {
+                        problem = true;
+                        log.error("joueur illisible ignoré dans {} : {}", file, ex.toString());
+                    }
                 }
             }
             for (JsonElement e : root.getAsJsonArray("villages")) {

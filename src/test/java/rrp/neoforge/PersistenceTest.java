@@ -103,4 +103,19 @@ class PersistenceTest {
         assertEquals(1, reg.size());
         assertFalse(reg.all().contains(b));
     }
+
+    @Test
+    void playerRolesAndPurseSurviveReload() {
+        java.util.UUID id = java.util.UUID.randomUUID();
+        PlayerService.ledger().clear();
+        PlayerService.ledger().switchRole(id, rrp.core.player.PlayerRole.MERCHANT, 5, 0);
+        PlayerService.ledger().deposit(id, 12);
+        VillageRegistry reg = new VillageRegistry();
+        assertTrue(persistence(reg).flush());
+        PlayerService.ledger().clear();
+        persistence(new VillageRegistry()).load();
+        assertEquals(rrp.core.player.PlayerRole.MERCHANT, PlayerService.roleOf(id));
+        assertEquals(12, PlayerService.ledger().purse(id));
+        PlayerService.ledger().clear();
+    }
 }
