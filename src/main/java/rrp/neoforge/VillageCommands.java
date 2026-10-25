@@ -206,6 +206,10 @@ final class VillageCommands {
     }
 
     private static void territory(CommandSourceStack src, String[] args) {
+        if (args.length >= 4 && args[1].equals("incident")) {
+            incident(src, args);
+            return;
+        }
         Lang lang = RrpMod.lang();
         Vec3 pos = src.getPosition();
         String world = Worlds.name(src.getLevel());
@@ -219,6 +223,31 @@ final class VillageCommands {
             legend.append((char) ('A' + i % 26)).append('=').append(order.get(i)).append(' ');
         }
         Commands.reply(src, lang.get("territory.legend", legend.toString().trim()));
+        var sites = RrpMod.registry().all().stream().filter(s -> s.worldName().equals(world)).toList();
+        for (VillageSite s : sites) {
+            Commands.reply(src, lang.msg("territory.doctrine", s.id(), s.doctrine() == null ? "—" : s.doctrine().name()));
+        }
+        for (int i = 0; i < sites.size(); i++) {
+            for (int j = i + 1; j < sites.size(); j++) {
+                VillageSite a = sites.get(i);
+                VillageSite b = sites.get(j);
+                int n = rrp.neoforge.ExploitationWatcher.incidents(a.id(), b.id());
+                Commands.reply(src, lang.msg("territory.relation", a.id(), b.id(),
+                        rrp.core.territory.FactionRelations.stance(a.doctrine(), b.doctrine(), n).name(), n));
+            }
+        }
+    }
+
+    /** {@code territory incident <propriétaire> <intrus>} : provoque un incident de frontière (diagnostic). */
+    private static void incident(CommandSourceStack src, String[] args) {
+        VillageSite owner = RrpMod.registry().get(args[2]);
+        VillageSite intruder = RrpMod.registry().get(args[3]);
+        if (owner == null || intruder == null || owner == intruder) {
+            Commands.reply(src, RrpMod.lang().msg("status.none"));
+            return;
+        }
+        var stage = rrp.neoforge.ExploitationWatcher.incident(src.getLevel(), owner, intruder, RrpMod.simConfig(), RrpMod.registry());
+        Commands.reply(src, RrpMod.lang().msg("territory.incident", owner.id(), intruder.id(), stage.name()));
     }
 
     private static void status(CommandSourceStack src, String[] args) {

@@ -99,8 +99,34 @@ grep -E "Ordres de construction|Defenses|Coffres" "$LOG4" | tail -n 3
 mkdir -p "$ROOT/.athanor/visuels"; python3 "$ROOT/tools/topdown.py" run/rrp-urban-world "$ROOT/.athanor/visuels/m38-village.png" > /dev/null 2>&1 || echo "SERVER: top-down export skipped"
 grep -E "tick|P50|P95|ms" "$LOG4" | grep -i -E "average|P50|P95" | tail -n 2
 
+# Phase 5 (fresh world): two villages 150 blocks apart in different biomes (badlands patch under village 2):
+# borders, doctrines, relations and a forced border incident
+LOG5="$ROOT/.athanor/.verif/server5.log"
+sed -i 's/^level-name=.*/level-name=rrp-borders-world/' run/server.properties
+rm -rf run/rrp-borders-world
+# explicit coordinates (no tilde: the shell would expand it); village 1 around 0 0, village 2 around 150 0, flat world y=-60
+CL=()
+for X in 0 150; do
+  for d in "1 0" "-1 0" "0 1" "0 -1"; do
+    set -- $d
+    CL+=("summon minecraft:villager $((X+$1)) -60 $2 {NoAI:1b}")
+  done
+  CL+=("setblock $((X+2)) -60 2 minecraft:red_bed[part=head,facing=east]" "setblock $((X+3)) -60 3 minecraft:barrel")
+  for i in 0 1 2 3; do
+    CL+=("item replace block $((X+3)) -60 3 container.$i with minecraft:oak_log 64" "item replace block $((X+3)) -60 3 container.$((i+4)) with minecraft:cobblestone 64")
+  done
+done
+at2() { echo "execute positioned 150 -60 0 run $*"; }
+PHASE_DELAY=0.4 run_phase "$LOG5" "difficulty peaceful" "forceload add -16 -100 260 100" "fillbiome 40 -60 -100 150 -60 100 minecraft:badlands" "fillbiome 151 -60 -100 260 -60 100 minecraft:badlands"   "${CL[@]}" "rrp village scan" "rrp warehouse set" "$(at2 rrp warehouse set)" "rrp townhall build" "$(at2 rrp townhall build)"   "rrp village scan" "rrp village act" "rrp village act" "rrp tick 1200" "rrp territory" "rrp territory incident village-1 village-2" "rrp territory" "rrp village flush"
+if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG5"; then echo "SERVER: mod error in log (phase 5)"; grep -E "\[.*/ERROR\]" "$LOG5" | head -5; exit 1; fi
+for pat in "Doctrine de village-1 : MERCHANT_CITY" "Doctrine de village-2 : WARLIKE_EMPIRE" "Relation village-1 <-> village-2 : NEUTRAL (incidents : 0)"            "Incident de frontière provoqué : village-1 contre village-2" "Relation village-1 <-> village-2 : [A-Z]* (incidents : [1-9]"; do
+  grep -q "$pat" "$LOG5" || { echo "SERVER: phase 5 missing: $pat"; grep -E "Doctrine|Relation|Territoire|village-" "$LOG5" | tail -n 12; exit 1; }
+done
+echo "SERVER: borders + doctrines + border incident on two villages in different biomes"
+python3 "$ROOT/tools/topdown.py" run/rrp-borders-world "$ROOT/.athanor/visuels/m45-borders.png" > /dev/null 2>&1 || echo "SERVER: top-down export skipped"
+
 # leave no stray world behind: the GameTest server reads run/server.properties and would load these villages
 sed -i 's/^level-name=.*/level-name=rrp-test-world/' run/server.properties
-rm -rf run/rrp-test-world run/rrp-crisis-world run/rrp-urban-world
+rm -rf run/rrp-test-world run/rrp-crisis-world run/rrp-urban-world run/rrp-borders-world
 
 echo "SERVER: mod loaded, commands answered, village + roles survived a restart"

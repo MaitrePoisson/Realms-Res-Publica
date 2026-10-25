@@ -78,7 +78,7 @@ public final class Commands {
         String sub = args.length == 0 || args[0].isEmpty() ? "help" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "help" -> help(source);
-            case "tick", "village", "warehouse", "townhall", "status", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
+            case "tick", "village", "warehouse", "townhall", "status", "territory", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
                 Handler h = HANDLERS.get(sub);
                 if (h == null) {
                     reply(source, lang.msg("error.not_ready", sub));
