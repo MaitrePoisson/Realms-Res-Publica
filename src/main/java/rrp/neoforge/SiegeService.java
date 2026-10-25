@@ -187,7 +187,7 @@ public final class SiegeService {
     }
 
     private static String kindName(Siege.Kind k) {
-        return RrpMod.lang().msg("siege.kind." + k.name().toLowerCase(Locale.ROOT));
+        return RrpMod.lang().get("siege.kind." + k.name().toLowerCase(Locale.ROOT));
     }
 
     /** Un bâtisseur présent assemble la prochaine machine si le bois de l'entrepôt suffit. */
