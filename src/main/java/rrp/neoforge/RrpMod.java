@@ -41,6 +41,7 @@ public final class RrpMod {
     private static BirthService births;
     private static ActionBarService actionBar;
     private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
+    private static rrp.neoforge.logistics.LogisticsDriver logistics;
     private static CrisisService crises;
     private static WarService war;
     private static Persistence persistence;
@@ -72,6 +73,7 @@ public final class RrpMod {
     public static BirthService births() { return births; }
     public static ActionBarService actionBar() { return actionBar; }
     public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
+    public static rrp.neoforge.logistics.LogisticsDriver logistics() { return logistics; }
     public static CrisisService crises() { return crises; }
     public static WarService war() { return war; }
     public static Persistence persistence() { return persistence; }
@@ -107,6 +109,8 @@ public final class RrpMod {
         births = new BirthService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
         actionBar = new ActionBarService(RrpMod::simConfig, RrpMod::server, REGISTRY, RrpMod::lang);
         behaviors = new rrp.neoforge.behaviors.BehaviorScheduler(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
+        logistics = new rrp.neoforge.logistics.LogisticsDriver(RrpMod::simConfig,
+                new rrp.neoforge.logistics.ChestAccess(RrpMod::simConfig, WAREHOUSE, REGISTRY));
         crises = new CrisisService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter, RrpMod::lang, LOG);
         war = new WarService(RrpMod::simConfig, RrpMod::server, REGISTRY, adapter, crises, RrpMod::lang, LOG);
         persistence = new Persistence(REGISTRY, server.getWorldPath(LevelResource.ROOT).resolve(MOD_ID), LOG);
@@ -123,6 +127,7 @@ public final class RrpMod {
         gauges.onTicks(t);
         actionBar.onTicks(t);
         births.onTicks(t);
+        logistics.onTicks(t);
         behaviors.onTicks(t);
         crises.onTicks(t);
         war.onTicks(t);
@@ -169,6 +174,9 @@ public final class RrpMod {
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         TICKS.unregister(worldTimer);
+        if (logistics != null) {
+            logistics.closeAll();
+        }
         CaravanService.abortAll(REGISTRY);
         if (persistence != null) {
             adapter.saveAll();

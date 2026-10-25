@@ -138,7 +138,8 @@ public final class RrpGameTests {
 
     private static boolean act(GameTestHelper h, VillageSite site) {
         boolean did = false;
-        for (Villager v : RrpMod.adapter().present(site, h.getLevel())) {
+        // only this test's villagers: the village also lists the neighbouring arenas' ones
+        for (Villager v : h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds())) {
             did |= RrpMod.behaviors().runOnce(site, h.getLevel(), v);
         }
         return did;
@@ -502,7 +503,7 @@ public final class RrpGameTests {
         BarrelBlockEntity barrel = WarehouseService.barrel(site, level);
         barrel.setItem(0, new ItemStack(Items.OAK_PLANKS, 1));
         RrpMod.warehouse().refresh(site, level);
-        var builder = RrpMod.adapter().present(site, level).get(0);
+        var builder = mine(h);
         int[] first = rrp.neoforge.TerritoryService.nextMissing(level, map, site.id());
         h.assertTrue(first != null, "posts missing at start");
         RrpMod.behaviors().runOnce(site, level, builder);
@@ -1631,5 +1632,165 @@ public final class RrpGameTests {
             RrpMod.setSimConfig(saved);
         }
         h.succeed();
+    }
+
+    // ---------- physical logistics (M69) ----------
+
+    private static Container barrelAt(GameTestHelper h, BlockPos abs) {
+        return (Container) h.getLevel().getBlockEntity(abs);
+    }
+
+    /** A villager spawned by this test (arenas share the world: the village also lists the neighbours'). */
+    private static Villager mine(GameTestHelper h) {
+        return h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds()).get(0);
+    }
+
+    private static int carried(Villager v, Resource r) {
+        return rrp.neoforge.logistics.CarriedItems.count(v, r);
+    }
+
+    private static int carriedTotal(Villager v) {
+        return rrp.neoforge.logistics.CarriedItems.total(v);
+    }
+
+    /** Puts the villager next to the barrel (inside reach) or well outside it. */
+    private static void stand(Villager v, BlockPos barrel, boolean near) {
+        v.setPos(barrel.getX() + (near ? 1.5 : -8.5), barrel.getY(), barrel.getZ() + 0.5);
+    }
+
+    @GameTest(template = ARENA)
+    public static void chestaccess(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        var access = logi.access();
+        BlockPos barrel = new BlockPos(site.warehouse()[0], site.warehouse()[1], site.warehouse()[2]);
+        Container chest = barrelAt(h, barrel);
+        chest.setItem(0, new ItemStack(Items.OAK_LOG, 20));
+        RrpMod.warehouse().refresh(site, level);
+        Villager v = mine(h);
+        // far: nothing moves, a trip is requested, the scheduler leaves the villager alone
+        stand(v, barrel, false);
+        var far = access.withdraw(v, site, level, Resource.WOOD, 10, true);
+        h.assertTrue(far.moved() == 0 && far.tripRequested(), "far villager gets nothing and a trip is requested: " + far);
+        h.assertTrue(chest.getItem(0).getCount() == 20 && carried(v, Resource.WOOD) == 0, "stock untouched while far");
+        h.assertTrue(logi.busy(v) && !RrpMod.behaviors().work(site, level, v), "mid-trip villager is skipped by the scheduler");
+        h.assertTrue(logi.trip(v).kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.WITHDRAW, "withdraw trip");
+        logi.cancel(v);
+        h.assertTrue(!logi.busy(v), "cancelled trip frees the villager");
+        h.assertTrue(!access.deposit(v, site, level, null, true).tripRequested(), "nothing carried: no deposit trip");
+        // near: items are taken, the hand shows them
+        stand(v, barrel, true);
+        var near = access.withdraw(v, site, level, Resource.WOOD, 10, true);
+        h.assertTrue(near.moved() == 10 && !near.tripRequested(), "near villager takes 10: " + near);
+        h.assertTrue(chest.getItem(0).getCount() == 10 && carried(v, Resource.WOOD) == 10, "10 moved from the barrel to the villager");
+        h.assertTrue(v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).is(Items.OAK_LOG), "main hand shows the load");
+        h.assertTrue(site.state().stock(Resource.WOOD) == 10, "village stock follows the barrel");
+        // capacity: carry_capacity bounds the load
+        int cap = access.capacity();
+        var more = access.withdraw(v, site, level, Resource.WOOD, 1000, true);
+        h.assertTrue(more.moved() == 10 && carriedTotal(v) <= cap, "empty barrel gives the 10 left, took " + more.moved());
+        chest.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        h.assertTrue(access.withdraw(v, site, level, Resource.WOOD, 1000, false).moved() == cap - 20, "fills up to the capacity");
+        // persistence: the carried stack is in the villager's saved inventory
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        v.saveWithoutId(tag);
+        Villager copy = EntityType.VILLAGER.create(level);
+        copy.load(tag);
+        h.assertTrue(carried(copy, Resource.WOOD) == cap, "carried stack survives a save/load: " + carried(copy, Resource.WOOD));
+        copy.discard();
+        // deposit: far gets nothing, near puts everything back
+        stand(v, barrel, false);
+        var farDep = access.deposit(v, site, level, null, true);
+        h.assertTrue(farDep.moved() == 0 && farDep.tripRequested(), "far deposit moves nothing and requests a trip");
+        logi.cancel(v);
+        stand(v, barrel, true);
+        chest.setItem(0, ItemStack.EMPTY);
+        var dep = access.deposit(v, site, level, null, true);
+        h.assertTrue(dep.moved() == cap && carried(v, Resource.WOOD) == 0, "near deposit empties the load: " + dep);
+        h.assertTrue(RrpMod.warehouse().read(site, level).getOrDefault(Resource.WOOD, 0) == cap, "stock holds the deposit");
+        h.assertTrue(v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).isEmpty(), "hand empty after the deposit");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void chesttrip(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        BlockPos barrel = new BlockPos(site.warehouse()[0], site.warehouse()[1], site.warehouse()[2]);
+        barrelAt(h, barrel).setItem(0, new ItemStack(Items.COBBLESTONE, 12));
+        RrpMod.warehouse().refresh(site, level);
+        Villager v = mine(h);
+        var open = net.minecraft.world.level.block.state.properties.BlockStateProperties.OPEN;
+        stand(v, barrel, false);
+        var trip = logi.requestWithdraw(v, site, level, Resource.STONE, 12);
+        h.assertTrue(trip != null && trip.phase() == rrp.core.logistics.ChestTrip.Phase.GO_TO_CHEST, "trip starts walking");
+        long opens = logi.opens(), closes = logi.closes(), sounds = logi.sounds();
+        for (int i = 0; i < 50; i++) {
+            logi.onTicks(1);
+        }
+        h.assertTrue(trip.phase() == rrp.core.logistics.ChestTrip.Phase.GO_TO_CHEST && !trip.done(), "a far villager keeps walking");
+        stand(v, barrel, true);
+        int rummage = 0;
+        boolean lidOpen = false;
+        for (int i = 0; i < 200 && !trip.done(); i++) {
+            logi.onTicks(1);
+            if (trip.phase() == rrp.core.logistics.ChestTrip.Phase.RUMMAGE) {
+                rummage++;
+                lidOpen |= level.getBlockState(barrel).getValue(open);
+                h.assertTrue(v.isShiftKeyDown(), "rummaging villager sneaks");
+                h.assertTrue(carried(v, Resource.STONE) == 0, "nothing carried before the rummage ends");
+            }
+        }
+        h.assertTrue(trip.done() && !trip.failed() && trip.moved() == 12, "trip done with 12 units: " + trip.moved());
+        h.assertTrue(rummage >= 19 && rummage <= 41, "rummage lasts 20-40 ticks, was " + rummage);
+        h.assertTrue(lidOpen, "barrel lid was open during the rummage");
+        h.assertTrue(!level.getBlockState(barrel).getValue(open), "lid closed afterwards");
+        h.assertTrue(logi.opens() - opens == 1 && logi.closes() - closes == 1 && logi.sounds() - sounds == 2, "open + close sounds played once");
+        h.assertTrue(carried(v, Resource.STONE) == 12 && !logi.busy(v) && !v.isShiftKeyDown(), "load carried, villager released");
+        h.assertTrue(logi.requestWithdraw(v, site, level, Resource.STONE, 5) == null, "no container holds stone: no trip");
+        // a deposit trip walks back and puts the load in
+        stand(v, barrel, false);
+        var back = logi.requestDeposit(v, site, level, null);
+        h.assertTrue(back != null && back.kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.DEPOSIT, "deposit trip");
+        stand(v, barrel, true);
+        for (int i = 0; i < 200 && !back.done(); i++) {
+            logi.onTicks(1);
+        }
+        h.assertTrue(back.done() && back.moved() == 12 && carried(v, Resource.STONE) == 0, "deposit trip delivered 12");
+        h.assertTrue(barrelAt(h, barrel).getItem(0).getCount() == 12, "stone back in the barrel");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 900, batch = "chestwalk")
+    public static void chestwalk(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        // clear the playground (the arena floor sits one block below the test origin) and put the barrel on the ground
+        for (int x = 6; x <= 16; x++) {
+            for (int z = 6; z <= 16; z++) {
+                for (int y = 0; y <= 3; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        h.setBlock(new BlockPos(14, 0, 14), Blocks.BARREL);
+        BlockPos barrel = h.absolutePos(new BlockPos(14, 0, 14));
+        RrpMod.warehouse().set(site, level, barrel);
+        barrelAt(h, barrel).setItem(0, new ItemStack(Items.OAK_LOG, 8));
+        RrpMod.warehouse().refresh(site, level);
+        Villager v = mine(h);
+        v.setNoAi(false);
+        v.setPos(barrel.getX() - 5.5, barrel.getY(), barrel.getZ() + 0.5);
+        var trip = logi.requestWithdraw(v, site, level, Resource.WOOD, 8);
+        h.assertTrue(trip != null, "trip requested");
+        h.succeedWhen(() -> {
+            h.assertTrue(!trip.failed(), "trip failed: " + trip.reason());
+            h.assertTrue(trip.done() && trip.moved() == 8 && carried(v, Resource.WOOD) == 8,
+                    "villager walks to the barrel and takes the logs (phase " + trip.phase() + ", moved " + trip.moved()
+                    + ", distance " + rrp.neoforge.logistics.ChestAccess.distance(v, barrel) + ")");
+        });
     }
 }

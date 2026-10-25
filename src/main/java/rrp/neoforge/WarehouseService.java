@@ -125,6 +125,22 @@ public final class WarehouseService {
         return out;
     }
 
+    /**
+     * The gate of physical access: stock containers whose centre is at most {@code reach} blocks from {@code from},
+     * nearest first. Nothing can be taken from or put in a container that is not in this list.
+     */
+    public List<Container> containersInReach(VillageSite site, ServerLevel level, net.minecraft.world.phys.Vec3 from, double reach) {
+        List<Container> near = new ArrayList<>();
+        for (Container c : containers(site, level)) {
+            if (c instanceof BlockEntity be && from.distanceTo(net.minecraft.world.phys.Vec3.atCenterOf(be.getBlockPos())) <= reach) {
+                near.add(c);
+            }
+        }
+        near.sort(java.util.Comparator.comparingDouble(
+                c -> from.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(((BlockEntity) c).getBlockPos()))));
+        return near;
+    }
+
     /** Nombre de coffres/tonneaux communautaires (hors entrepôt désigné). */
     public int communityChests(VillageSite site, ServerLevel level) {
         return Math.max(0, containers(site, level).size() - (barrel(site, level) != null ? 1 : 0));
@@ -233,7 +249,8 @@ public final class WarehouseService {
         return true;
     }
 
-    private static void insert(Container b, ItemStack rest) {
+    /** Inserts as much of {@code rest} as fits in the container (it shrinks by what was moved). */
+    public static void insert(Container b, ItemStack rest) {
         for (int pass = 0; pass < 2 && !rest.isEmpty(); pass++) {
             for (int i = 0; i < b.getContainerSize() && !rest.isEmpty(); i++) {
                 ItemStack slot = b.getItem(i);
