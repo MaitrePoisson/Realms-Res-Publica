@@ -5,7 +5,7 @@ import rrp.core.abstractsim.Lod;
 
 import java.util.Locale;
 
-/** {@code rrp lod}: lists the level of detail of every village; {@code rrp lod force <village> active|abstract|auto}. */
+/** {@code rrp lod}: lists the level of detail of every village; {@code rrp lod force <village> active|abstract|auto}; {@code rrp lod perf [reset]} prints the mod cost per tick. */
 final class LodCommands {
 
     private LodCommands() {
@@ -17,6 +17,18 @@ final class LodCommands {
 
     private static void command(CommandSourceStack src, String[] args) {
         Lang lang = RrpMod.lang();
+        if (args.length >= 2 && "perf".equalsIgnoreCase(args[1])) {
+            if (args.length >= 3 && "reset".equalsIgnoreCase(args[2])) {
+                RrpMod.ticks().resetCost();
+            }
+            int abs = 0;
+            for (VillageSite s : RrpMod.registry().all()) {
+                abs += s.isAbstract() ? 1 : 0;
+            }
+            Commands.reply(src, String.format(Locale.ROOT, "PERF villages=%d abstract=%d mod_ms_per_tick=%.4f",
+                    RrpMod.registry().size(), abs, RrpMod.ticks().averageMsPerTick()));
+            return;
+        }
         if (args.length >= 4 && "force".equalsIgnoreCase(args[1])) {
             VillageSite site = RrpMod.registry().get(args[2]);
             if (site == null) {
