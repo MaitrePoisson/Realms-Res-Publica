@@ -14,6 +14,8 @@ public final class PlayerService {
 
     private static final rrp.core.player.Zones ZONES = new rrp.core.player.Zones();
 
+    private static final rrp.core.player.Contracts CONTRACTS = new rrp.core.player.Contracts();
+
     private PlayerService() {
     }
 
@@ -23,6 +25,10 @@ public final class PlayerService {
 
     public static rrp.core.player.Laws laws() {
         return LAWS;
+    }
+
+    public static rrp.core.player.Contracts contracts() {
+        return CONTRACTS;
     }
 
     public static rrp.core.player.Zones zones() {

@@ -51,6 +51,9 @@ public final class WarResolution {
 
     public static synchronized List<Result> history() { return new ArrayList<>(HISTORY); }
 
+    /** Appends a verdict to the history (used by tests that need a known outcome). */
+    public static synchronized void record(Result r) { HISTORY.add(r); }
+
     /** Âge des guerres en cours, pour les commandes. */
     public static synchronized Map<String, Double> ages() { return new TreeMap<>(AGES); }
 

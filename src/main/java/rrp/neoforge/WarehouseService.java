@@ -279,4 +279,47 @@ public final class WarehouseService {
         registry.markDirty();
         return amount - remaining;
     }
+
+    /** Number of {@code item} held in the stock (warehouse and chests). */
+    public int count(VillageSite site, ServerLevel level, Item item) {
+        if (barrel(site, level) == null) {
+            return 0;
+        }
+        int n = 0;
+        for (Container b : containers(site, level)) {
+            for (int i = 0; i < b.getContainerSize(); i++) {
+                if (b.getItem(i).is(item)) {
+                    n += b.getItem(i).getCount();
+                }
+            }
+        }
+        return n;
+    }
+
+    /** Takes exactly {@code amount} of {@code item} out of the stock, or nothing; true when it was taken. */
+    public boolean take(VillageSite site, ServerLevel level, Item item, int amount) {
+        if (amount <= 0 || count(site, level, item) < amount) {
+            return false;
+        }
+        int remaining = amount;
+        for (Container b : containers(site, level)) {
+            for (int i = 0; i < b.getContainerSize() && remaining > 0; i++) {
+                ItemStack it = b.getItem(i);
+                if (!it.is(item)) {
+                    continue;
+                }
+                int t = Math.min(remaining, it.getCount());
+                remaining -= t;
+                if (t == it.getCount()) {
+                    b.setItem(i, ItemStack.EMPTY);
+                } else {
+                    it.shrink(t);
+                }
+            }
+            b.setChanged();
+        }
+        refresh(site, level);
+        registry.markDirty();
+        return true;
+    }
 }

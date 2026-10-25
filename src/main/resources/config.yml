@@ -277,6 +277,24 @@ tax_per_villager: 2
 tax_free_burden: 0.5
 # Loyaute perdue par villageois et par periode pour chaque point de taux au-dessus du seuil. [0 ; 1000]
 tax_unrest_per_point: 20
+# Paie de base (emeraudes) d'un contrat de nettoyage de campement. [0 ; 10000]
+contract_pay_base: 3
+# Supplement de paie par pillard du campement. [0 ; 1000]
+contract_pay_per_raider: 1
+# Paie (emeraudes) d'un contrat de guerre affiche par un village. [0 ; 10000]
+contract_war_pay: 8
+# Periode (s) entre deux affichages automatiques de contrats par les villages. [0 ; 1000000]
+contract_post_period_s: 600
+# Duree (s) apres laquelle un contrat que personne n'accepte expire et rend la paie. [0 ; 1000000]
+contract_open_ttl_s: 3600
+# Duree (s) laissee au mercenaire pour remplir un contrat accepte. [0 ; 1000000]
+contract_timeout_s: 1800
+# Nombre maximal de contrats acceptes en meme temps par un mercenaire. [1 ; 20]
+contract_max_per_mercenary: 2
+# Nombre maximal de contrats ouverts en meme temps par un village. [1 ; 20]
+contract_max_per_village: 2
+# Variation de l'indice de relation apres un contrat reussi (camp adverse ou village d'origine du campement). [0 ; 100]
+contract_relation_shift: 10
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]

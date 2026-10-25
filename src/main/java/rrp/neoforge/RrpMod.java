@@ -50,6 +50,7 @@ public final class RrpMod {
         PlayerCommands.install();
         LawService.install();
         PlanService.install();
+        ContractService.install();
         LOG.info("Realms & Res Publica chargé");
     }
 
@@ -121,6 +122,7 @@ public final class RrpMod {
         WarResolution.onTicks(t, simConfig, REGISTRY);
         ExploitationWatcher.onTicks(t, simConfig);
         LawService.onTicks(t, simConfig, REGISTRY);
+        ContractService.onTicks(t, simConfig, REGISTRY);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };
 

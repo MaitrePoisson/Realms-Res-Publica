@@ -108,6 +108,34 @@ public final class Persistence {
             pl.add(r);
         });
         root.add("players", pl);
+        JsonArray ct = new JsonArray();
+        PlayerService.contracts().all().forEach(c -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("id", c.id());
+            r.addProperty("issuer", c.issuer());
+            r.addProperty("type", c.type().name());
+            r.addProperty("target", c.target());
+            r.addProperty("pay", c.pay());
+            r.addProperty("postedAt", c.postedAt());
+            r.addProperty("state", c.state().name());
+            if (c.mercenary() != null) {
+                r.addProperty("mercenary", c.mercenary().toString());
+            }
+            r.addProperty("acceptedAt", c.acceptedAt());
+            r.addProperty("kills", c.kills());
+            r.addProperty("mark", c.mark());
+            r.addProperty("settled", c.settled());
+            ct.add(r);
+        });
+        root.add("contracts", ct);
+        JsonArray rp = new JsonArray();
+        PlayerService.contracts().reputations().forEach((k, v) -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("id", k.toString());
+            r.addProperty("value", v);
+            rp.add(r);
+        });
+        root.add("reputation", rp);
         JsonArray lw = new JsonArray();
         PlayerService.laws().all().forEach((k, l) -> {
             JsonObject r = new JsonObject();
@@ -157,6 +185,7 @@ public final class Persistence {
         DiplomacyService.treaties().clear();
         WarResolution.clearTributaries();
         PlayerService.ledger().clear();
+        PlayerService.contracts().clear();
         registry.consumeDirty();
         if (!Files.isRegularFile(file)) {
             return 0;
@@ -224,6 +253,34 @@ public final class Persistence {
                     } catch (RuntimeException ex) {
                         problem = true;
                         log.error("joueur illisible ignoré dans {} : {}", file, ex.toString());
+                    }
+                }
+            }
+            if (root.has("contracts")) {
+                for (JsonElement e : root.getAsJsonArray("contracts")) {
+                    try {
+                        JsonObject r = e.getAsJsonObject();
+                        PlayerService.contracts().restore(rrp.core.player.Contracts.restored(r.get("id").getAsInt(),
+                                r.get("issuer").getAsString(), rrp.core.player.Contract.Type.valueOf(r.get("type").getAsString()),
+                                r.get("target").getAsString(), r.get("pay").getAsLong(), r.get("postedAt").getAsDouble(),
+                                rrp.core.player.Contract.State.valueOf(r.get("state").getAsString()),
+                                r.has("mercenary") ? java.util.UUID.fromString(r.get("mercenary").getAsString()) : null,
+                                r.get("acceptedAt").getAsDouble(), r.get("kills").getAsInt(), r.get("mark").getAsInt(),
+                                r.get("settled").getAsBoolean()));
+                    } catch (RuntimeException ex) {
+                        problem = true;
+                        log.error("contrat illisible ignore dans {} : {}", file, ex.toString());
+                    }
+                }
+            }
+            if (root.has("reputation")) {
+                for (JsonElement e : root.getAsJsonArray("reputation")) {
+                    try {
+                        JsonObject r = e.getAsJsonObject();
+                        PlayerService.contracts().restoreReputation(java.util.UUID.fromString(r.get("id").getAsString()), r.get("value").getAsInt());
+                    } catch (RuntimeException ex) {
+                        problem = true;
+                        log.error("reputation illisible ignoree dans {} : {}", file, ex.toString());
                     }
                 }
             }

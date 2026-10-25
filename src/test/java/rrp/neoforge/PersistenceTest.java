@@ -150,4 +150,32 @@ class PersistenceTest {
         assertEquals(rrp.core.player.ZoneType.MARKET, PlayerService.zones().typeAt("v1", -3, 6));
         PlayerService.zones().clear();
     }
+
+    @Test
+    void contractsAndReputationSurviveReload() {
+        java.util.UUID merc = java.util.UUID.randomUUID();
+        PlayerService.contracts().clear();
+        var open = PlayerService.contracts().post("v1", rrp.core.player.Contract.Type.CLEAR_CAMP, "camp1", 7, 10);
+        var taken = PlayerService.contracts().post("v1", rrp.core.player.Contract.Type.WAR_ATTACK, "v2", 9, 11);
+        PlayerService.contracts().accept(taken.id(), merc, 20, 2);
+        taken.addKill();
+        taken.setMark(3);
+        PlayerService.contracts().restoreReputation(merc, 4);
+        assertTrue(persistence(new VillageRegistry()).flush());
+        PlayerService.contracts().clear();
+        persistence(new VillageRegistry()).load();
+        var a = PlayerService.contracts().get(open.id());
+        var b = PlayerService.contracts().get(taken.id());
+        assertTrue(a != null && b != null);
+        assertEquals(rrp.core.player.Contract.State.OPEN, a.state());
+        assertEquals(7, a.pay());
+        assertEquals(rrp.core.player.Contract.State.ACCEPTED, b.state());
+        assertEquals(merc, b.mercenary());
+        assertEquals(1, b.kills());
+        assertEquals(3, b.mark());
+        assertEquals(4, PlayerService.contracts().reputation(merc));
+        assertTrue(PlayerService.contracts().post("v3", rrp.core.player.Contract.Type.CLEAR_CAMP, "c", 1, 0).id() > b.id(),
+                "ids keep growing after a reload");
+        PlayerService.contracts().clear();
+    }
 }
