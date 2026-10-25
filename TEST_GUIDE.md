@@ -4,10 +4,10 @@
 NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.jar` to `mods/`. Solo: open a world with cheats on (integrated server). Dedicated: start the server and give yourself op. The log must print "Realms & Res Publica activé". `/rrp` is an alias of `/respublica`.
 
 ## Commands
-`help`, `townhall [info|set|build]`, `status [village]`, `village [list|scan|flush]`, `warehouse set` (look at a barrel), `inspect [uuid]` (look at a villager), `setrole <role> [uuid]` (fermier, forestier, mineur, garde, intendant, batisseur, diplomate), `tick <n>` (accelerated time), `famine|overpopulate|insecurity [village]` (debug crises), `reload`.
+`help`, `townhall [info|set|build]`, `status [village]`, `village [list|scan|flush]`, `warehouse set` (look at a barrel), `inspect [uuid]` (look at a villager), `setrole <role> [uuid]` (fermier, forestier, mineur, garde, intendant, batisseur, diplomate), `tick <n>` (accelerated time), `famine|overpopulate|insecurity [village]` (debug crises), `territory [incident <owner> <intruder>]` (chunk ownership, doctrines, relations; incident forces a border incident), `reload`.
 
 ## Automated checks
-- `bash .athanor/check.sh` (or `./gradlew build` + `bash tools/run_sim.sh`): unit tests, balance simulator, 15 headless GameTests (`runGameTestServer`), and a real NeoForge dedicated server run (create village, roles, births, crises, restart persistence).
+- `bash .athanor/check.sh` (or `./gradlew build` + `bash tools/run_sim.sh`): unit tests, balance simulator, 18 headless GameTests (`runGameTestServer`), and a real NeoForge dedicated server run (create village, roles, births, crises, restart persistence).
 - GameTests alone: `./gradlew runGameTestServer`.
 
 ## Manual checklist
@@ -30,3 +30,13 @@ NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.j
 - The steward orders a building only when the community store holds at least `expansion_wood_quota` wood AND `expansion_stone_quota` stone (after reserving what queued orders will cost), the village has `expansion_population_quota` villagers, and fewer than `max_build_orders` orders are queued. A village with wood but no stone does not grow.
 - Targets: houses when beds < population + `builder_spare_beds`; farms = population/4; workshops = population/6; towers = population/8; wall segments from 12 villagers. The most-needed type that the stock can pay for is ordered.
 - If an order cannot be built (no flat spot, missing plan) it is dropped silently; check `/rrp status` for the queue, buildings and roads. Use `/rrp tick <n>` to speed things up.
+
+## Territory, doctrines and relations (for testing)
+- `/rrp territory` lists each village's doctrine, owned chunks, contested chunks and the relation between villages (trade / neutral / hostile).
+- Doctrine comes from the biome around the Town Hall at founding (badlands/mountains -> warlike empire, plains/beach/river/savanna/desert -> merchant city, swamp/jungle/taiga/forest -> isolationist theocracy; majority vote on a 9x9 biome grid, tie -> merchant) and never changes.
+- Put two villages closer than about 10 chunks: borders form where influence overlaps. Let villagers work next to the border: provocation rises (`provocation_per_act`), then warning (3), expulsion by guards (6), border war (10). A merchant city never trespasses; an empire always does.
+- `/rrp territory incident <owner> <intruder>` forces an incident for testing; 3 incidents turn the relation hostile. `territory_trespass: 1` lets villagers cross borders freely.
+- Keys: `territory_hall_radius`, `territory_outpost_radius`, `territory_owner_threshold`, `territory_contest_margin`, `territory_trespass`, `provocation_per_act|warn|expel|war|decay_s`.
+- Border posts (stone bricks, chiseled block, banner in the faction colour) are placed by a builder only when no house is needed; the village needs at least one builder and some stone in the community store. The borders themselves are logical claims that exist without posts.
+- Provocation decays slowly (0.02/s): use `/rrp tick <n>` or the `incident` command to see escalation quickly. Two merchant/theocracy villages never trespass on their own; use the `incident` command to test their relation.
+- Messages are French only.
