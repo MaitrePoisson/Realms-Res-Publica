@@ -12,6 +12,8 @@ public final class PlayerService {
 
     private static final rrp.core.player.Laws LAWS = new rrp.core.player.Laws();
 
+    private static final rrp.core.player.Zones ZONES = new rrp.core.player.Zones();
+
     private PlayerService() {
     }
 
@@ -21,6 +23,10 @@ public final class PlayerService {
 
     public static rrp.core.player.Laws laws() {
         return LAWS;
+    }
+
+    public static rrp.core.player.Zones zones() {
+        return ZONES;
     }
 
     public static PlayerRole roleOf(UUID id) {

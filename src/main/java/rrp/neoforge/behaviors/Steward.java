@@ -49,7 +49,7 @@ public final class Steward extends RoleBehavior {
                 site.state().stock(Resource.WOOD), site.state().stock(Resource.STONE), site.hall(), site.built(),
                 java.util.List.copyOf(site.orders()));
         var order = ExpansionPlanner.plan(situation, quotas, (int) cfg.get(SimConfig.Key.BUILDER_SPARE_BEDS),
-                site.doctrine());
+                site.doctrine(), rrp.neoforge.PlayerService.zones().peek(site.id()));
         order.ifPresent(o -> {
             site.orders().add(o);
             ctx.registry().markDirty();

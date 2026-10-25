@@ -4,6 +4,8 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import rrp.core.player.ZoneType;
+import rrp.core.player.Zones;
 import rrp.core.territory.Doctrine;
 
 /**
@@ -29,6 +31,25 @@ public final class ExpansionPlanner {
 
     /** Idem, avec les bâtiments et les défenses favorisés par la doctrine ({@code null} = neutre). */
     public static Optional<BuildOrder> plan(Situation s, Quotas q, int spareBeds, Doctrine doctrine) {
+        return plan(s, q, spareBeds, doctrine, List.of());
+    }
+
+    /** Plot type a building must stand on once the ruler has drawn plots of it; null = no dedicated plot type. */
+    static ZoneType zoneOf(BuildType t) {
+        return switch (t) {
+            case HOUSE -> ZoneType.RESIDENTIAL;
+            case FARM -> ZoneType.FARM;
+            case MARKET -> ZoneType.MARKET;
+            case BARRACKS -> ZoneType.BARRACKS;
+            default -> null;
+        };
+    }
+
+    /**
+     * Idem, honouring the plots drawn by the ruler: a building with a dedicated plot type goes into such a plot when
+     * one exists (and is favoured), every other site avoids the plots, and nothing is ever placed in a forbidden one.
+     */
+    public static Optional<BuildOrder> plan(Situation s, Quotas q, int spareBeds, Doctrine doctrine, List<Zones.Zone> zones) {
         if (s.hall() == null || s.queued().size() >= q.maxOrders() || s.population() < q.population()) {
             return Optional.empty();
         }
@@ -51,6 +72,9 @@ public final class ExpansionPlanner {
         for (BuildType t : BuildType.values()) {
             int need = target(t, s, spareBeds, doctrine) - have.getOrDefault(t, 0);
             int score = need > 0 && preferred(doctrine, t) ? need + 100 : need;
+            if (need > 0 && zoneOf(t) != null && Zones.has(zones, zoneOf(t))) {
+                score += 50;
+            }
             if (score > bestScore && need > 0 && wood >= t.wood() && stone >= t.stone()) {
                 best = t;
                 bestScore = score;
@@ -60,8 +84,29 @@ public final class ExpansionPlanner {
             return Optional.empty();
         }
         int index = s.queued().size() + s.built().values().stream().mapToInt(Integer::intValue).sum();
-        int[] p = slot(s.hall(), index);
+        int[] p = place(s.hall(), index, best, have.getOrDefault(best, 0), zones);
         return Optional.of(BuildOrder.of(best, p[0], p[1], p[2]));
+    }
+
+    /** Building spot: inside a plot of its own type if the ruler drew one, else on the ring outside every plot. */
+    static int[] place(int[] hall, int index, BuildType t, int sameType, List<Zones.Zone> zones) {
+        if (zones.isEmpty()) {
+            return slot(hall, index);
+        }
+        ZoneType zt = zoneOf(t);
+        if (zt != null) {
+            int[] spot = Zones.spot(zones, zt, sameType, 8);
+            if (spot != null) {
+                return new int[] {spot[0], hall[1], spot[1]};
+            }
+        }
+        for (int i = 0; i < 64; i++) {
+            int[] p = slot(hall, index + i);
+            if (Zones.typeAt(zones, p[0], p[2]) == null) {
+                return p;
+            }
+        }
+        return slot(hall, index);
     }
 
     /** Nombre de bâtiments souhaités de ce type (déjà construits ou commandés compris) pour cette population. */

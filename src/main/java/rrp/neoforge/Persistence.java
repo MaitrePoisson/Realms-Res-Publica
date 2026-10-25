@@ -124,6 +124,18 @@ public final class Persistence {
             lw.add(r);
         });
         root.add("laws", lw);
+        JsonArray zn = new JsonArray();
+        PlayerService.zones().all().forEach((k, list) -> list.forEach(z -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("village", k);
+            r.addProperty("type", z.type().name());
+            r.addProperty("minX", z.minX());
+            r.addProperty("minZ", z.minZ());
+            r.addProperty("maxX", z.maxX());
+            r.addProperty("maxZ", z.maxZ());
+            zn.add(r);
+        }));
+        root.add("zones", zn);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(FILE + ".tmp");
@@ -186,6 +198,19 @@ public final class Persistence {
                     } catch (RuntimeException ex) {
                         problem = true;
                         log.error("loi illisible ignoree dans {} : {}", file, ex.toString());
+                    }
+                }
+            }
+            if (root.has("zones")) {
+                for (JsonElement e : root.getAsJsonArray("zones")) {
+                    try {
+                        JsonObject r = e.getAsJsonObject();
+                        PlayerService.zones().add(r.get("village").getAsString(), rrp.core.player.Zones.Zone.of(
+                                rrp.core.player.ZoneType.valueOf(r.get("type").getAsString()), r.get("minX").getAsInt(),
+                                r.get("minZ").getAsInt(), r.get("maxX").getAsInt(), r.get("maxZ").getAsInt()));
+                    } catch (RuntimeException ex) {
+                        problem = true;
+                        log.error("zone illisible ignoree dans {} : {}", file, ex.toString());
                     }
                 }
             }

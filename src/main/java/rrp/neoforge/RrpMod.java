@@ -49,6 +49,7 @@ public final class RrpMod {
         CrisisCommands.install();
         PlayerCommands.install();
         LawService.install();
+        PlanService.install();
         LOG.info("Realms & Res Publica chargé");
     }
 

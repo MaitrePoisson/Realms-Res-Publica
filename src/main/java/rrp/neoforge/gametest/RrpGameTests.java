@@ -1137,4 +1137,50 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA, batch = "planner")
+    public static void urbanplanning(GameTestHelper h) {
+        rrp.neoforge.PlayerService.zones().clear();
+        try {
+            VillageSite site = village(h, 8, 1, 0);
+            BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+            TownHall.build(h.getLevel(), hall);
+            site.setHall(hall.getX(), hall.getY(), hall.getZ());
+            setAll(h, Role.STEWARD);
+            var store = WarehouseService.barrel(site, h.getLevel());
+            store.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+            store.setItem(1, new ItemStack(Items.COBBLESTONE, 64));
+            store.setItem(2, new ItemStack(Items.OAK_LOG, 64));
+            RrpMod.warehouse().refresh(site, h.getLevel());
+            int hx = hall.getX();
+            int hz = hall.getZ();
+            h.assertTrue(rrp.neoforge.PlanService.addZone(site, rrp.core.player.ZoneType.FARM, hx + 8, hz - 30, hx + 30, hz - 8)
+                    == rrp.neoforge.PlanService.Verdict.OK, "farm plot accepted");
+            h.assertTrue(rrp.neoforge.PlanService.addZone(site, rrp.core.player.ZoneType.FORBIDDEN, hx - 30, hz - 8, hx - 8, hz + 8)
+                    == rrp.neoforge.PlanService.Verdict.OK, "forbidden plot accepted");
+            h.assertTrue(rrp.neoforge.PlanService.addZone(site, rrp.core.player.ZoneType.FARM, hx, hz, hx + 500, hz)
+                    == rrp.neoforge.PlanService.Verdict.TOO_BIG, "oversized plot refused");
+            h.assertTrue(rrp.neoforge.PlanService.addZone(site, rrp.core.player.ZoneType.FARM, hx + 3000, hz, hx + 3010, hz + 5)
+                    == rrp.neoforge.PlanService.Verdict.OUTSIDE, "unclaimed land refused");
+            h.assertTrue(rrp.neoforge.PlayerService.zones().peek(site.id()).size() == 2, "two plots kept");
+            for (int i = 0; i < 6; i++) {
+                act(h, site);
+            }
+            h.assertTrue(!site.orders().isEmpty(), "steward issued orders");
+            var plots = rrp.neoforge.PlayerService.zones().peek(site.id());
+            for (var o : site.orders()) {
+                var at = rrp.core.player.Zones.typeAt(plots, o.x(), o.z());
+                h.assertTrue(at != rrp.core.player.ZoneType.FORBIDDEN, "nothing in the forbidden plot: " + o);
+                if (o.type() == rrp.neoforge.urban.BuildType.FARM) {
+                    h.assertTrue(at == rrp.core.player.ZoneType.FARM, "farm stands in the farm plot: " + o);
+                } else {
+                    h.assertTrue(at == null, o.type() + " stays outside every plot: " + o);
+                }
+            }
+        } finally {
+            rrp.neoforge.PlayerService.zones().clear();
+            wipeTown(h);
+        }
+        h.succeed();
+    }
 }

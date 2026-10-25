@@ -80,4 +80,27 @@ class ExpansionPlannerTest {
         var o = ExpansionPlanner.plan(sit(16, 16, 500, 500, Map.of(), List.of()), Q, 2).orElseThrow();
         assertTrue(o.type() != BuildType.MARKET && o.type() != BuildType.BARRACKS && o.type() != BuildType.MONUMENT);
     }
+
+    @Test
+    void zonesGuideTheSite() {
+        var farmPlot = List.of(rrp.core.player.Zones.Zone.of(rrp.core.player.ZoneType.FARM, 200, 200, 230, 230));
+        BuildOrder o = ExpansionPlanner.plan(sit(8, 20, 200, 100, Map.of(), List.of()), Q, 2, null, farmPlot).orElseThrow();
+        assertEquals(BuildType.FARM, o.type());
+        assertTrue(farmPlot.get(0).contains(o.x(), o.z()), "farm built inside the market plot");
+        // a house with only a market plot drawn stays outside it
+        BuildOrder h = ExpansionPlanner.plan(sit(10, 4, 200, 100, Map.of(), List.of()), Q, 2, null,
+                List.of(rrp.core.player.Zones.Zone.of(rrp.core.player.ZoneType.MARKET, 110, 90, 130, 110))).orElseThrow();
+        assertEquals(BuildType.HOUSE, h.type());
+        assertTrue(!(h.x() >= 110 && h.x() <= 130 && h.z() >= 90 && h.z() <= 110), "house avoids the market plot");
+    }
+
+    @Test
+    void forbiddenPlotsAreNeverBuiltOn() {
+        var all = new java.util.ArrayList<rrp.core.player.Zones.Zone>();
+        all.add(rrp.core.player.Zones.Zone.of(rrp.core.player.ZoneType.FORBIDDEN, 100, 90, 130, 110));
+        for (int built = 0; built < 12; built++) {
+            BuildOrder o = ExpansionPlanner.plan(sit(10, 4, 200, 100, Map.of(BuildType.HOUSE, built), List.of()), Q, 2, null, all).orElseThrow();
+            assertTrue(rrp.core.player.Zones.typeAt(all, o.x(), o.z()) == null, "free of plots: " + o);
+        }
+    }
 }

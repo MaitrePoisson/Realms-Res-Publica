@@ -138,4 +138,16 @@ class PersistenceTest {
         assertEquals(0.25, r.tax("FOOD"), 1e-9);
         PlayerService.laws().clear();
     }
+
+    @Test
+    void zonesSurviveReload() {
+        PlayerService.zones().clear();
+        PlayerService.zones().add("v1", rrp.core.player.Zones.Zone.of(rrp.core.player.ZoneType.MARKET, 5, 6, -3, 20));
+        assertTrue(persistence(new VillageRegistry()).flush());
+        PlayerService.zones().clear();
+        persistence(new VillageRegistry()).load();
+        assertEquals(rrp.core.player.ZoneType.MARKET, PlayerService.zones().typeAt("v1", 0, 10));
+        assertEquals(rrp.core.player.ZoneType.MARKET, PlayerService.zones().typeAt("v1", -3, 6));
+        PlayerService.zones().clear();
+    }
 }
