@@ -30,6 +30,7 @@ final class VillageCommands {
         Commands.register("townhall", VillageCommands::townHall);
         Commands.register("status", VillageCommands::status);
         Commands.register("territory", VillageCommands::territory);
+        Commands.register("caravan", VillageCommands::caravan);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -250,6 +251,19 @@ final class VillageCommands {
         }
         var stage = rrp.neoforge.ExploitationWatcher.incident(src.getLevel(), owner, intruder, RrpMod.simConfig(), RrpMod.registry());
         Commands.reply(src, RrpMod.lang().msg("territory.incident", owner.id(), intruder.id(), stage.name()));
+    }
+
+    /** {@code caravan <village> <village>} : envoie une caravane si un troc est possible (diagnostic). */
+    private static void caravan(CommandSourceStack src, String[] args) {
+        VillageSite a = args.length >= 3 ? RrpMod.registry().get(args[1]) : null;
+        VillageSite b = args.length >= 3 ? RrpMod.registry().get(args[2]) : null;
+        if (a == null || b == null || a == b) {
+            Commands.reply(src, RrpMod.lang().msg("status.none"));
+            return;
+        }
+        var sent = CaravanService.dispatch(a, b, RrpMod.simConfig());
+        Commands.reply(src, sent.isPresent() ? RrpMod.lang().msg("caravan.sent", sent.get().from(), sent.get().to())
+                : RrpMod.lang().msg("caravan.none", a.id(), b.id()));
     }
 
     private static void status(CommandSourceStack src, String[] args) {

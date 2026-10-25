@@ -110,6 +110,7 @@ public final class RrpMod {
         behaviors.onTicks(t);
         crises.onTicks(t);
         war.onTicks(t);
+        CaravanService.onTicks(t, simConfig, REGISTRY);
         RelationService.onTicks(t, simConfig, REGISTRY);
         ExploitationWatcher.onTicks(t, simConfig);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
@@ -145,6 +146,7 @@ public final class RrpMod {
     @SubscribeEvent
     public static void onServerStopping(ServerStoppingEvent event) {
         TICKS.unregister(worldTimer);
+        CaravanService.abortAll(REGISTRY);
         if (persistence != null) {
             adapter.saveAll();
             persistence.flush();

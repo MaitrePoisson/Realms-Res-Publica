@@ -167,6 +167,24 @@ relation_hostile_at: -30
 relation_incident_penalty: 15
 # Retour de l'indice vers sa base, par seconde. [0 ; 10]
 relation_decay_s: 0.05
+# Secondes entre deux recherches de troc entre villes partenaires (0 = jamais). [0 ; 100000]
+caravan_interval_s: 120
+# Stock a partir duquel une ressource est un surplus a echanger. [1 ; 100000]
+caravan_surplus: 100
+# Stock sous lequel une ressource manque (reserve gardee par le vendeur). [0 ; 100000]
+caravan_deficit: 40
+# Quantite maximale transportee par une caravane. [1 ; 1000]
+caravan_max_load: 32
+# Gardes d'escorte maximum (chacun divise par deux le risque d'embuscade). [0 ; 4]
+caravan_escorts: 2
+# Probabilite d'embuscade sans escorte. [0 ; 1]
+caravan_ambush_chance: 0.1
+# Duree maximale d'un trajet avant arrivee forcee, en secondes. [10 ; 100000]
+caravan_timeout_s: 180
+# Indice relationnel gagne par un echange reussi. [0 ; 100]
+caravan_relation_gain: 8
+# Indice relationnel perdu par une caravane perdue. [0 ; 100]
+caravan_relation_loss: 10
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

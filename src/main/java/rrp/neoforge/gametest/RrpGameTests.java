@@ -222,7 +222,8 @@ public final class RrpGameTests {
                 act(h, site);
             }
             h.assertTrue(!site.orders().isEmpty(), "steward issued no order for a bed shortage");
-            h.assertTrue(site.orders().get(0).type() == rrp.neoforge.urban.BuildType.HOUSE, "first order is a house");
+            // the doctrine comes from the biome at this (varying) spot and may put its own building first: the
+            // house-first rule of the neutral planner is covered by ExpansionPlannerTest
             h.assertTrue(site.orders().size() <= 3, "orders capped");
             h.succeed();
         } finally {
@@ -766,6 +767,48 @@ public final class RrpGameTests {
         RrpMod.ticks().advance(2000);
         double ms = RrpMod.ticks().averageMsPerTick();
         h.assertTrue(ms < 5.0, "mod cost " + ms + " ms/tick");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void caravan(GameTestHelper h) {
+        VillageSite a = village(h, 2, 2, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.CARAVAN_AMBUSH_CHANCE, 0)
+                    .with(rrp.core.SimConfig.Key.CARAVAN_INTERVAL_S, 0));
+            rrp.neoforge.CaravanService.reset();
+            Container ba = (Container) h.getBlockEntity(new BlockPos(14, 1, 14));
+            ba.setItem(1, new ItemStack(Items.IRON_INGOT, 64));
+            ba.setItem(2, new ItemStack(Items.IRON_INGOT, 56));
+            BlockPos bp = barrel(h, 18, 18, 0);
+            VillageSite b = RrpMod.registry().create(a.worldName(), bp.getX(), bp.getY(), bp.getZ(), 5);
+            h.assertTrue(RrpMod.warehouse().set(b, level, bp), "second warehouse");
+            Container bb = (Container) level.getBlockEntity(bp);
+            for (int i = 0; i < 4; i++) {
+                bb.setItem(i, new ItemStack(Items.BREAD, 50));
+            }
+            bb.setItem(5, new ItemStack(Items.IRON_INGOT, 5));
+            RrpMod.warehouse().refresh(a, level);
+            RrpMod.warehouse().refresh(b, level);
+            int foodBefore = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            var sent = rrp.neoforge.CaravanService.dispatch(a, b, RrpMod.simConfig());
+            h.assertTrue(sent.isPresent(), "a caravan should leave: iron for wheat");
+            h.assertTrue(rrp.neoforge.CaravanService.active() == 1, "one caravan on the road");
+            h.assertTrue(RrpMod.warehouse().read(a, level).getOrDefault(Resource.ORE, 0) < 120, "cargo left the warehouse");
+            RrpMod.ticks().advance(4000);
+            RrpMod.ticks().advance(4000);
+            h.assertTrue(rrp.neoforge.CaravanService.completed() == 1, "caravan completed");
+            h.assertTrue(rrp.neoforge.CaravanService.active() == 0, "no caravan left");
+            int foodAfter = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            h.assertTrue(foodAfter > foodBefore, "wheat arrived: " + foodBefore + " -> " + foodAfter);
+            h.assertTrue(RrpMod.warehouse().read(b, level).getOrDefault(Resource.ORE, 0) > 5, "iron delivered");
+        } finally {
+            rrp.neoforge.CaravanService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
         h.succeed();
     }
 }
