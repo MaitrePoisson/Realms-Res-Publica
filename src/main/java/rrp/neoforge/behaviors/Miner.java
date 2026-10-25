@@ -16,7 +16,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-/** Casse minerais (en priorité) et pierre naturelle proches de son poste, et dépose le butin. */
+/** Casse minerais (en priorité) et pierre naturelle proches de son poste, et porte le butin à l'entrepôt à pied. */
 public final class Miner extends RoleBehavior {
 
     private static final Set<Block> NATURAL_STONE = Set.of(Blocks.STONE, Blocks.DEEPSLATE, Blocks.ANDESITE,
@@ -35,6 +35,9 @@ public final class Miner extends RoleBehavior {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
+        if (!hasRoom(ctx)) {
+            return unload(ctx); // full: walk to the warehouse and deposit
+        }
         Level level = ctx.level();
         List<BlockPos> targets = new ArrayList<>(nearby(ctx, 6, 3, Miner::isOre).stream().filter(p -> isExposed(level, p)).toList());
         targets.addAll(nearby(ctx, 2, 3, s -> NATURAL_STONE.contains(s.getBlock())).stream().filter(p -> isExposed(level, p)).toList());
@@ -42,7 +45,7 @@ public final class Miner extends RoleBehavior {
         ItemStack pickaxe = new ItemStack(Items.IRON_PICKAXE);
         int done = 0;
         for (BlockPos pos : targets) {
-            if (done >= MAX_PER_RUN) {
+            if (done >= MAX_PER_RUN || !hasRoom(ctx)) {
                 break;
             }
             BlockState state = level.getBlockState(pos);
@@ -53,11 +56,14 @@ public final class Miner extends RoleBehavior {
                 walkToward(ctx, pos);
             }
             for (ItemStack drop : Block.getDrops(state, ctx.level(), pos, null, ctx.villager(), pickaxe)) {
-                store(ctx, drop, pos);
+                carry(ctx, drop, pos);
             }
             level.setBlock(pos, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
             ExploitationWatcher.worked(ctx, pos);
             done++;
+        }
+        if (done == 0 || !hasRoom(ctx)) {
+            unload(ctx); // no more rock in range, or the arms are full: take the load home
         }
         return done > 0;
     }

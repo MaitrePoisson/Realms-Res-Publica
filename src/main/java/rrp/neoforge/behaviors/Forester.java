@@ -14,7 +14,7 @@ import rrp.neoforge.ExploitationWatcher;
 
 import java.util.List;
 
-/** Abat des troncs proches (par le haut du tronc), replante une pousse au pied et dépose le bois. */
+/** Abat des troncs proches (par le haut du tronc), replante une pousse au pied et porte le bois à l'entrepôt à pied. */
 public final class Forester extends RoleBehavior {
 
     /** Troncs coupés au plus à chaque action. */
@@ -30,9 +30,12 @@ public final class Forester extends RoleBehavior {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
+        if (!hasRoom(ctx)) {
+            return unload(ctx); // full: walk to the warehouse and deposit
+        }
         Level level = ctx.level();
         int done = 0;
-        for (int i = 0; i < MAX_PER_RUN; i++) {
+        for (int i = 0; i < MAX_PER_RUN && hasRoom(ctx); i++) {
             List<BlockPos> logs = nearby(ctx, 2, 12, Forester::isLog).stream()
                     .filter(p -> isTreeTrunk(level, p)).toList();
             logs = ExploitationWatcher.filter(ctx, logs);
@@ -48,7 +51,7 @@ public final class Forester extends RoleBehavior {
             }
             BlockState kind = level.getBlockState(log);
             for (ItemStack drop : Block.getDrops(kind, ctx.level(), log, null)) {
-                store(ctx, drop, log);
+                carry(ctx, drop, log);
             }
             level.setBlock(log, Blocks.AIR.defaultBlockState(), Block.UPDATE_CLIENTS);
             if (level.getBlockState(log.below()).is(BlockTags.DIRT)) {
@@ -56,6 +59,9 @@ public final class Forester extends RoleBehavior {
             }
             ExploitationWatcher.worked(ctx, log);
             done++;
+        }
+        if (done == 0 || !hasRoom(ctx)) {
+            unload(ctx); // no more tree in range, or the arms are full: take the load home
         }
         return done > 0;
     }

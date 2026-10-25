@@ -1793,4 +1793,80 @@ public final class RrpGameTests {
                     + ", distance " + rrp.neoforge.logistics.ChestAccess.distance(v, barrel) + ")");
         });
     }
+
+    // ---------- gatherers carry on foot (M70) ----------
+
+    private static int inStock(VillageSite site, ServerLevel level, Resource r) {
+        return RrpMod.warehouse().read(site, level).getOrDefault(r, 0);
+    }
+
+    /**
+     * The gatherer holds a load of {@code r} far from the warehouse: the stock has not moved; it only arrives once
+     * the villager has walked to the barrel (a deposit trip), never before.
+     */
+    private static void carryRound(GameTestHelper h, VillageSite site, Villager v, BlockPos barrel, Resource r, String who) {
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        int load = carried(v, r);
+        h.assertTrue(load > 0, who + " carries what it gathered: " + load);
+        h.assertTrue(inStock(site, level, r) == 0, who + ": stock unchanged while the load is far (" + inStock(site, level, r) + ")");
+        // nothing left to gather in range: the next action sets off to the warehouse
+        for (int i = 0; i < 12 && !logi.busy(v); i++) {
+            act(h, site); // may first clear the rest of the work in range
+        }
+        h.assertTrue(logi.busy(v) && logi.trip(v).kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.DEPOSIT, who + " walks to the warehouse");
+        for (int i = 0; i < 30; i++) {
+            logi.onTicks(1);
+        }
+        h.assertTrue(inStock(site, level, r) == 0 && carried(v, r) == load, who + ": still nothing delivered while far");
+        stand(v, barrel, true);
+        for (int i = 0; i < 200 && logi.busy(v); i++) {
+            logi.onTicks(1);
+        }
+        h.assertTrue(!logi.busy(v) && carried(v, r) == 0, who + " unloaded");
+        h.assertTrue(inStock(site, level, r) == load, who + ": the barrel received exactly the load, " + inStock(site, level, r) + " vs " + load);
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 400)
+    public static void carryonfoot(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0); // the scan needs a real village; only one villager works below
+        ServerLevel level = h.getLevel();
+        level.setDayTime(6000);
+        level.getEntitiesOfClass(Villager.class, h.getBounds()).stream().skip(1).forEach(Villager::discard);
+        BlockPos barrel = new BlockPos(site.warehouse()[0], site.warehouse()[1], site.warehouse()[2]);
+        Villager v = mine(h);
+        // farmer: the crops end in the hands, not in the barrel
+        BlockPos wheat = new BlockPos(12, 1, 12);
+        h.setBlock(new BlockPos(12, 0, 12), Blocks.FARMLAND);
+        h.setBlock(wheat, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+        setAll(h, Role.FARMER);
+        h.assertTrue(act(h, site), "farmer did nothing");
+        carryRound(h, site, v, barrel, Resource.FOOD, "farmer");
+        // forester
+        BlockPos log = new BlockPos(8, 1, 12);
+        h.setBlock(log, Blocks.OAK_LOG);
+        h.setBlock(log.above(), Blocks.OAK_LOG);
+        h.setBlock(log.above(2), Blocks.OAK_LEAVES);
+        setAll(h, Role.FORESTER);
+        stand(v, barrel, false);
+        v.setPos(h.absolutePos(new BlockPos(10, 1, 10)).getCenter());
+        h.assertTrue(act(h, site), "forester did nothing");
+        carryRound(h, site, v, barrel, Resource.WOOD, "forester");
+        // miner
+        h.setBlock(new BlockPos(11, 1, 8), Blocks.COAL_ORE);
+        setAll(h, Role.MINER);
+        v.setPos(h.absolutePos(new BlockPos(10, 1, 10)).getCenter());
+        h.assertTrue(act(h, site), "miner did nothing");
+        carryRound(h, site, v, barrel, Resource.ORE, "miner");
+        // full arms: the gatherer stops gathering and goes home even with work in range
+        int cap = RrpMod.logistics().access().capacity();
+        v.setPos(h.absolutePos(new BlockPos(10, 1, 10)).getCenter());
+        rrp.neoforge.logistics.CarriedItems.add(v, new ItemStack(Items.BREAD, cap), cap);
+        h.setBlock(wheat, Blocks.WHEAT.defaultBlockState().setValue(CropBlock.AGE, 7));
+        setAll(h, Role.FARMER);
+        h.assertTrue(act(h, site), "a full farmer heads for the warehouse");
+        h.assertTrue(h.getBlockState(wheat).getValue(CropBlock.AGE) == 7, "a full farmer harvests nothing more");
+        h.assertTrue(RrpMod.logistics().busy(v), "the full farmer is on a deposit trip");
+        h.succeed();
+    }
 }

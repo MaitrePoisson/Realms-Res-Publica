@@ -10,7 +10,7 @@ import rrp.neoforge.ExploitationWatcher;
 
 import java.util.List;
 
-/** Récolte les cultures mûres proches, les replante (âge 0) et dépose la récolte à l'entrepôt. */
+/** Récolte les cultures mûres proches, les replante (âge 0) et porte la récolte à l'entrepôt à pied. */
 public final class Farmer extends RoleBehavior {
 
     /** Cultures récoltées au plus à chaque action. */
@@ -26,10 +26,13 @@ public final class Farmer extends RoleBehavior {
         if (!ctx.site().hasWarehouse()) {
             return false;
         }
+        if (!hasRoom(ctx)) {
+            return unload(ctx); // full: walk to the warehouse and deposit
+        }
         List<BlockPos> ripe = ExploitationWatcher.filter(ctx, nearby(ctx, 3, 3, Farmer::isRipe));
         int done = 0;
         for (BlockPos pos : ripe) {
-            if (done >= MAX_PER_RUN) {
+            if (done >= MAX_PER_RUN || !hasRoom(ctx)) {
                 break;
             }
             if (done == 0) {
@@ -37,11 +40,14 @@ public final class Farmer extends RoleBehavior {
             }
             BlockState state = ctx.level().getBlockState(pos);
             for (ItemStack drop : Block.getDrops(state, ctx.level(), pos, null)) {
-                store(ctx, drop, pos);
+                carry(ctx, drop, pos);
             }
             ctx.level().setBlock(pos, ((CropBlock) state.getBlock()).getStateForAge(0), Block.UPDATE_CLIENTS);
             ExploitationWatcher.worked(ctx, pos);
             done++;
+        }
+        if (done == 0 || !hasRoom(ctx)) {
+            unload(ctx); // nothing left to harvest in range, or the arms are full: take the load home
         }
         return done > 0;
     }

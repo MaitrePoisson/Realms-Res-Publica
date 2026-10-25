@@ -9,6 +9,7 @@ import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.core.VillagerState;
 import rrp.neoforge.WarehouseService;
+import rrp.neoforge.logistics.CarriedItems;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -64,6 +65,35 @@ public abstract class RoleBehavior {
         if (left != null && !left.isEmpty()) {
             Block.popResource(ctx.level(), spill, left);
         }
+    }
+
+    /** True while the villager can still carry something (its load is below {@code carry_capacity}). */
+    protected static boolean hasRoom(BehaviorContext ctx) {
+        return CarriedItems.free(ctx.villager(), ctx.logistics().access().capacity()) > 0;
+    }
+
+    /**
+     * Puts a drop in the villager's load (never straight into the warehouse). Items that are not counted resources
+     * are dropped; the surplus over {@code carry_capacity} falls at {@code spill}.
+     */
+    protected static void carry(BehaviorContext ctx, ItemStack stack, BlockPos spill) {
+        if (stack == null || stack.isEmpty() || WarehouseService.classify(stack) == null) {
+            return;
+        }
+        int took = CarriedItems.add(ctx.villager(), stack, ctx.logistics().access().capacity());
+        if (took < stack.getCount()) {
+            Block.popResource(ctx.level(), spill, stack.copyWithCount(stack.getCount() - took));
+        }
+        CarriedItems.showInHand(ctx.villager());
+    }
+
+    /**
+     * Brings the load to the warehouse: deposits at once when the villager stands within reach of it, otherwise
+     * starts the walk to it (the deposit happens when it arrives). Returns true if something was moved or a trip started.
+     */
+    protected static boolean unload(BehaviorContext ctx) {
+        var result = ctx.logistics().access().deposit(ctx.villager(), ctx.site(), ctx.level(), null, true);
+        return result.moved() > 0 || result.tripRequested();
     }
 
     /** Si le villageois a de l'IA, il se dirige vers la position (l'action reste immédiate). */

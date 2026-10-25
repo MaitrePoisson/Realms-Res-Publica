@@ -12,6 +12,11 @@ import rrp.neoforge.WarehouseService;
 public record BehaviorContext(ServerLevel level, Villager villager, VillagerState state, VillageSite site,
                               WarehouseService warehouse, SimConfig config, VillageRegistry registry) {
 
+    /** The physical chest layer: carried loads, reach gate, walking trips. */
+    public rrp.neoforge.logistics.LogisticsDriver logistics() {
+        return rrp.neoforge.RrpMod.logistics();
+    }
+
     /** Rayon de travail (blocs) autour du villageois. */
     public int workRadius() {
         return (int) config.get(SimConfig.Key.WORK_RADIUS);
