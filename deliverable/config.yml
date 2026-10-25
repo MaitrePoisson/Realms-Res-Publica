@@ -295,6 +295,22 @@ contract_max_per_mercenary: 2
 contract_max_per_village: 2
 # Variation de l'indice de relation apres un contrat reussi (camp adverse ou village d'origine du campement). [0 ; 100]
 contract_relation_shift: 10
+# Prix de base (emeraudes par unite) d'une ressource a l'equilibre ; le minerai vaut 4 fois plus. [0 ; 1000]
+market_base_price: 0.5
+# Stock d'equilibre par villageois : en dessous le prix monte, au-dessus il baisse. [1 ; 10000]
+market_need_per_villager: 20
+# Multiplicateur minimal du prix (surplus) par rapport au prix de base. [0 ; 1]
+market_min_mult: 0.25
+# Multiplicateur maximal du prix (penurie) par rapport au prix de base. [1 ; 100]
+market_max_mult: 3
+# Ecart entre le prix d'achat et de vente d'un village (le marchand achete plus cher qu'il ne vend). [0 ; 1]
+market_spread: 0.1
+# Unites d'une ressource qu'un village accepte d'echanger par fenetre, achats et ventes confondus. [0 ; 100000]
+market_daily_limit: 64
+# Duree (s) de la fenetre du plafond d'echanges (1200 = un jour Minecraft). [1 ; 1000000]
+market_window_s: 1200
+# Gain d'indice de relation entre deux villages quand un marchand passe de l'un a l'autre pour commercer. [0 ; 100]
+market_relation_gain: 2
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]

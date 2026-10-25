@@ -51,6 +51,7 @@ public final class RrpMod {
         LawService.install();
         PlanService.install();
         ContractService.install();
+        MarketService.install();
         LOG.info("Realms & Res Publica chargé");
     }
 
@@ -123,6 +124,7 @@ public final class RrpMod {
         ExploitationWatcher.onTicks(t, simConfig);
         LawService.onTicks(t, simConfig, REGISTRY);
         ContractService.onTicks(t, simConfig, REGISTRY);
+        MarketService.onTicks(t, simConfig);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };
 

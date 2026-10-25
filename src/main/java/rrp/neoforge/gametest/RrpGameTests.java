@@ -1288,4 +1288,58 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void freemerchant(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        var ledger = rrp.neoforge.PlayerService.ledger();
+        ledger.clear();
+        rrp.neoforge.MarketService.reset();
+        try {
+            var cfg = RrpMod.simConfig();
+            Container ba = (Container) h.getBlockEntity(new BlockPos(14, 1, 14));
+            for (int i = 0; i < 4; i++) {
+                ba.setItem(i, new ItemStack(Items.BREAD, 64));
+            }
+            RrpMod.warehouse().refresh(a, level);
+            BlockPos bp = barrel(h, 18, 18, 0);
+            VillageSite b = RrpMod.registry().create(a.worldName(), bp.getX(), bp.getY(), bp.getZ(), 5);
+            h.assertTrue(RrpMod.warehouse().set(b, level, bp), "second warehouse");
+            var p = h.makeMockServerPlayerInLevel();
+            ledger.deposit(p.getUUID(), 50);
+            h.assertTrue(rrp.neoforge.MarketService.buy(p, a, Resource.FOOD, 5, cfg).verdict()
+                    == rrp.neoforge.MarketService.Verdict.NOT_MERCHANT, "observers cannot trade");
+            ledger.switchRole(p.getUUID(), rrp.core.player.PlayerRole.MERCHANT, 0, 0);
+            double rel = rrp.neoforge.RelationService.matrix().get(a.id(), b.id());
+            // buy low in the village with a surplus, sell high in the starving one
+            var bought = rrp.neoforge.MarketService.buy(p, a, Resource.FOOD, 30, cfg);
+            h.assertTrue(bought.verdict() == rrp.neoforge.MarketService.Verdict.OK && bought.quantity() == 30, "bought: " + bought);
+            h.assertTrue(ledger.purse(p.getUUID()) == 50 - bought.emeralds(), "purse charged");
+            var sold = rrp.neoforge.MarketService.sell(p, b, Resource.FOOD, 30, cfg);
+            h.assertTrue(sold.verdict() == rrp.neoforge.MarketService.Verdict.OK && sold.quantity() == 30, "sold: " + sold);
+            h.assertTrue(sold.emeralds() > bought.emeralds(), "arbitrage profit: paid " + bought.emeralds() + ", earned " + sold.emeralds());
+            h.assertTrue(rrp.neoforge.MarketService.stock(b, Resource.FOOD, level) == 30, "goods reached the second warehouse");
+            h.assertTrue(rrp.neoforge.RelationService.matrix().get(a.id(), b.id()) > rel, "trading between villages improves relations");
+            // saturation: the daily cap stops the exploit
+            int limit = (int) cfg.get(rrp.core.SimConfig.Key.MARKET_DAILY_LIMIT);
+            ledger.deposit(p.getUUID(), 1000);
+            var more = rrp.neoforge.MarketService.buy(p, a, Resource.FOOD, 1000, cfg);
+            h.assertTrue(more.quantity() == limit - 30, "capped at the daily limit: " + more);
+            h.assertTrue(rrp.neoforge.MarketService.buy(p, a, Resource.FOOD, 1, cfg).verdict()
+                    == rrp.neoforge.MarketService.Verdict.LIMIT, "no more today");
+            // a poor merchant cannot buy
+            ledger.clear();
+            ledger.switchRole(p.getUUID(), rrp.core.player.PlayerRole.MERCHANT, 0, 0);
+            h.assertTrue(rrp.neoforge.MarketService.buy(p, b, Resource.FOOD, 5, cfg).verdict()
+                    == rrp.neoforge.MarketService.Verdict.NO_FUNDS, "empty purse");
+        } finally {
+            rrp.neoforge.MarketService.reset();
+            ledger.clear();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
 }
