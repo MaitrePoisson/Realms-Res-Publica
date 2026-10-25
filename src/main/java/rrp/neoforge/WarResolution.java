@@ -126,7 +126,9 @@ public final class WarResolution {
         double strength = f == null ? 0 : f.strength();
         double alive = 1;
         ServerLevel level = Worlds.level(RrpMod.server(), me.worldName());
-        if (f != null && level != null && f.size() > 0) {
+        boolean loaded = level != null && me.hasHall()
+                && level.hasChunkAt(new net.minecraft.core.BlockPos(me.hall()[0], me.hall()[1], me.hall()[2]));
+        if (f != null && loaded && f.size() > 0) {
             alive = (double) MobilizationService.alive(f, level) / f.size();
         }
         var siege = SiegeService.siege(me.id());
@@ -168,7 +170,7 @@ public final class WarResolution {
     public static synchronized int pillage(VillageSite winner, VillageSite loser, SimConfig cfg) {
         ServerLevel lw = Worlds.level(RrpMod.server(), winner.worldName());
         ServerLevel ll = Worlds.level(RrpMod.server(), loser.worldName());
-        if (lw == null || ll == null) {
+        if (lw == null || ll == null || !lw.hasChunkAt(chunkPos(winner)) || !ll.hasChunkAt(chunkPos(loser))) {
             return 0;
         }
         var stock = RrpMod.warehouse().read(loser, ll);
@@ -178,7 +180,11 @@ public final class WarResolution {
                     (int) cfg.get(SimConfig.Key.WAR_LOOT_CAP));
             int taken = n > 0 ? RrpMod.warehouse().withdraw(loser, ll, res, n) : 0;
             if (taken > 0) {
-                RrpMod.warehouse().deposit(winner, lw, CaravanService.stackOf(res, taken));
+                var rest = RrpMod.warehouse().deposit(winner, lw, CaravanService.stackOf(res, taken));
+                if (!rest.isEmpty()) {
+                    RrpMod.warehouse().deposit(loser, ll, rest);
+                    taken -= rest.getCount();
+                }
                 total += taken;
             }
         }
@@ -229,7 +235,7 @@ public final class WarResolution {
             }
             ServerLevel ll = Worlds.level(RrpMod.server(), loser.worldName());
             ServerLevel lw = Worlds.level(RrpMod.server(), winner.worldName());
-            if (ll == null || lw == null) {
+            if (ll == null || lw == null || !lw.hasChunkAt(chunkPos(winner)) || !ll.hasChunkAt(chunkPos(loser))) {
                 continue;
             }
             var stock = RrpMod.warehouse().read(loser, ll);
@@ -239,7 +245,11 @@ public final class WarResolution {
                         (int) cfg.get(SimConfig.Key.WAR_TRIBUTE_CAP));
                 int taken = n > 0 ? RrpMod.warehouse().withdraw(loser, ll, res, n) : 0;
                 if (taken > 0) {
-                    RrpMod.warehouse().deposit(winner, lw, CaravanService.stackOf(res, taken));
+                    var rest = RrpMod.warehouse().deposit(winner, lw, CaravanService.stackOf(res, taken));
+                    if (!rest.isEmpty()) {
+                        RrpMod.warehouse().deposit(loser, ll, rest);
+                        taken -= rest.getCount();
+                    }
                     paid += taken;
                 }
             }
@@ -249,5 +259,9 @@ public final class WarResolution {
             }
         }
         return total;
+    }
+
+    private static net.minecraft.core.BlockPos chunkPos(VillageSite v) {
+        return net.minecraft.core.BlockPos.containing(v.x(), v.y(), v.z());
     }
 }

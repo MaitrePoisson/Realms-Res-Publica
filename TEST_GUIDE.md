@@ -40,3 +40,12 @@ NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.j
 - Border posts (stone bricks, chiseled block, banner in the faction colour) are placed by a builder only when no house is needed; the village needs at least one builder and some stone in the community store. The borders themselves are logical claims that exist without posts.
 - Provocation decays slowly (0.02/s): use `/rrp tick <n>` or the `incident` command to see escalation quickly. Two merchant/theocracy villages never trespass on their own; use the `incident` command to test their relation.
 - Messages are French only.
+
+## Diplomacy, caravans, wars and sieges (for testing)
+- Commands: `/rrp diplomacy` (relation index, treaties), `/rrp caravan` (active caravans), `/rrp regiment` (mobilised guards and gear), `/rrp siege` (engines and breach count), `/rrp war` (wars, verdicts, tribute).
+- Relations: build two villages 100-150 blocks apart; `/rrp diplomacy` shows the index. `/rrp territory incident <owner> <intruder>` lowers it by `relation_incident_penalty`.
+- Caravans: fill one warehouse above `caravan_surplus` and leave the partner short; a trader with escorts walks over within `caravan_interval_s`. Use `/rrp tick <n>` to speed up.
+- War: 3 incidents (`diplomacy_war_incidents`) give an ultimatum, then a war declaration after `diplomacy_war_delay_s`. Guards are mobilised, builders assemble a ram then a catapult near the border; breaches are capped by `siege_block_cap`.
+- Outcome: the verdict (REPELLED / PILLAGE / ANNEXATION / DESTRUCTION) appears in chat and `/rrp war`; annexation transfers claims and starts tribute. Ceasefire restores peace and the relation.
+- Automated: `bash .athanor/check.sh quick war` replays a two-village war on a real dedicated server (log assertions + top-down export).
+- Keys: `relation_*`, `caravan_*`, `diplomacy_*`, `mobilization_*`, `siege_*`, `war_*` in `config.yml`.
