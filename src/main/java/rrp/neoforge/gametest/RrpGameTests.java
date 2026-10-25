@@ -275,6 +275,28 @@ public final class RrpGameTests {
         h.succeed();
     }
 
+    @GameTest(template = ARENA, batch = "biomes")
+    public static void biomecompat(GameTestHelper h) {
+        var reg = h.getLevel().registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.BIOME);
+        int n = 0;
+        for (var holder : reg.holders().toList()) {
+            var r = rrp.neoforge.urban.BiomeAdapter.classify(holder);
+            if (r == null || r.kind() == null) { h.fail("no classification for " + holder.key()); return; }
+            n++;
+        }
+        // a biome that is not in any registry (no key, no tag): never throws, falls back on its climate
+        var builder = new net.minecraft.world.level.biome.Biome.BiomeBuilder()
+                .hasPrecipitation(false).temperature(2.0f).downfall(0.0f)
+                .specialEffects(new net.minecraft.world.level.biome.BiomeSpecialEffects.Builder()
+                        .waterColor(0x3f76e4).waterFogColor(0x050533).fogColor(0xc0d8ff).skyColor(0x77adff).build())
+                .mobSpawnSettings(net.minecraft.world.level.biome.MobSpawnSettings.EMPTY)
+                .generationSettings(net.minecraft.world.level.biome.BiomeGenerationSettings.EMPTY);
+        var r = rrp.neoforge.urban.BiomeAdapter.classify(net.minecraft.core.Holder.direct(builder.build()));
+        h.assertTrue(r.kind() == rrp.core.territory.BiomeClassifier.Kind.DESERT, "hot dry unknown biome -> desert, got " + r.kind());
+        h.assertTrue(n > 20, "vanilla biomes classified: " + n);
+        h.succeed();
+    }
+
     @GameTest(template = ARENA, batch = "blueprints")
     public static void blueprints(GameTestHelper h) {
         for (BlueprintPool.Kind k : BlueprintPool.Kind.values()) {

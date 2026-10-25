@@ -209,6 +209,7 @@ public final class SimConfig {
 
     private final EnumMap<Key, Double> values = new EnumMap<>(Key.class);
     private final List<String> warnings = new ArrayList<>();
+    private String biomeOverrides = "";
 
     private SimConfig() {
         for (Key k : Key.values()) {
@@ -231,6 +232,10 @@ public final class SimConfig {
             return c;
         }
         for (Map.Entry<String, ?> e : raw.entrySet()) {
+            if ("biome_overrides".equals(e.getKey())) {
+                c.biomeOverrides = String.valueOf(e.getValue());
+                continue;
+            }
             Key key = find(e.getKey());
             if (key == null) {
                 c.warnings.add("clé inconnue : " + e.getKey());
@@ -259,6 +264,11 @@ public final class SimConfig {
         return null;
     }
 
+    /** Raw {@code biome_overrides} text ({@code id=kind, ...}), parsed by BiomeClassifier.parseOverrides. */
+    public String biomeOverrides() {
+        return biomeOverrides;
+    }
+
     public double get(Key k) {
         return values.get(k);
     }
@@ -279,6 +289,7 @@ public final class SimConfig {
         }
         SimConfig c = new SimConfig();
         c.values.putAll(values);
+        c.biomeOverrides = biomeOverrides;
         c.values.put(k, v);
         return c;
     }

@@ -73,15 +73,15 @@ public final class TerritoryService {
         }
         int[] h = site.hall();
         int r = Math.min(RrpMod.simConfig().getInt(SimConfig.Key.VILLAGE_RADIUS), 96);
-        List<String> paths = new java.util.ArrayList<>();
+        List<rrp.core.territory.BiomeClassifier.Kind> kinds = new java.util.ArrayList<>();
         for (int i = -4; i <= 4; i++) {
             for (int j = -4; j <= 4; j++) {
                 BlockPos p = new BlockPos(h[0] + i * r / 4, h[1], h[2] + j * r / 4);
                 level.getChunk(p.getX() >> 4, p.getZ() >> 4); // un chunk non chargé renverrait le biome du générateur
-                paths.add(level.getBiome(p).unwrapKey().map(k -> k.location().getPath()).orElse(""));
+                kinds.add(rrp.neoforge.urban.BiomeAdapter.classify(level.getBiome(p)).kind());
             }
         }
-        site.setDoctrine(DoctrineSelector.select(paths));
+        site.setDoctrine(DoctrineSelector.selectKinds(kinds));
         RrpMod.registry().markDirty();
     }
 

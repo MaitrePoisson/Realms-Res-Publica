@@ -345,3 +345,5 @@ market_relation_gain: 2
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]
 show_action_bar: 1
+# Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
+biome_overrides: ""

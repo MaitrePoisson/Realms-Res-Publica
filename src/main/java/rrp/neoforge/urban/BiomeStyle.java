@@ -3,6 +3,8 @@ package rrp.neoforge.urban;
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;
 
+import rrp.core.territory.BiomeClassifier;
+
 import java.util.Locale;
 
 /** Familles de style de construction, déduites du biome du site. */
@@ -14,18 +16,23 @@ public enum BiomeStyle {
         return name().toLowerCase(Locale.ROOT);
     }
 
-    /** Famille d'après le chemin du biome (ex. {@code snowy_taiga}, {@code badlands}). */
+    /** Family from a biome path or id (any namespace), e.g. {@code snowy_taiga}, {@code terralith:alpine_highlands}. */
     public static BiomeStyle fromBiomePath(String path) {
-        String p = path == null ? "" : path.toLowerCase(Locale.ROOT);
-        if (p.contains("jungle") || p.contains("bamboo") || p.contains("swamp") || p.contains("mangrove")) return JUNGLE;
-        if (p.contains("desert") || p.contains("badlands") || p.contains("beach")) return DESERT;
-        if (p.contains("savanna")) return SAVANNA;
-        if (p.contains("snow") || p.contains("frozen") || p.contains("ice") || p.contains("taiga")
-                || p.contains("grove") || p.contains("peaks")) return SNOW;
-        return PLAINS;
+        return of(BiomeClassifier.classify(path));
+    }
+
+    public static BiomeStyle of(BiomeClassifier.Result r) {
+        if (r.cold()) return SNOW;
+        return switch (r.kind()) {
+            case JUNGLE, SWAMP -> JUNGLE;
+            case DESERT, BADLANDS, BEACH -> DESERT;
+            case SAVANNA -> SAVANNA;
+            case TAIGA -> SNOW;
+            default -> PLAINS;
+        };
     }
 
     public static BiomeStyle of(Holder<Biome> biome) {
-        return biome.unwrapKey().map(k -> fromBiomePath(k.location().getPath())).orElse(PLAINS);
+        return of(BiomeAdapter.classify(biome));
     }
 }
