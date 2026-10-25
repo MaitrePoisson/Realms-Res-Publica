@@ -852,4 +852,53 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void mobilization(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.MOBILIZATION_INTERVAL_S, 0));
+            var cfg = RrpMod.simConfig();
+            rrp.neoforge.DiplomacyService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            setAll(h, Role.GUARD);
+            Container ba = (Container) h.getBlockEntity(new BlockPos(14, 1, 14));
+            ba.setItem(1, new ItemStack(Items.IRON_INGOT, 12));
+            ba.setItem(2, new ItemStack(Items.OAK_LOG, 4));
+            RrpMod.warehouse().refresh(a, level);
+            VillageSite b = RrpMod.registry().create(a.worldName(), a.x() + 40, a.y(), a.z(), 5);
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.MobilizationService.force(a.id()) == null, "no regiment at peace");
+            rrp.neoforge.DiplomacyService.open(a.id(), b.id(), RrpMod.registry());
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            var f = rrp.neoforge.MobilizationService.force(a.id());
+            h.assertTrue(f != null, "regiment formed at war");
+            h.assertTrue(f.size() == 2, "regiment capped at half the population: " + f.size());
+            h.assertTrue(f.loadout().swords() == 2 && f.loadout().armors() == 2 && f.loadout().bows() == 2,
+                    "fully equipped from stock: " + f.loadout());
+            h.assertTrue(f.strength() == 2 * 3.5, "strength " + f.strength());
+            h.assertTrue(RrpMod.warehouse().read(a, level).getOrDefault(Resource.ORE, 0) == 0, "iron consumed");
+            int armed = 0;
+            for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+                if (v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).is(Items.IRON_SWORD)) {
+                    armed++;
+                }
+            }
+            h.assertTrue(armed == 2, "two villagers carry a sword: " + armed);
+            rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.PEACE);
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.MobilizationService.force(a.id()) == null, "demobilised at peace");
+            for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+                h.assertTrue(v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).isEmpty(), "gear removed");
+            }
+        } finally {
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.DiplomacyService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
 }

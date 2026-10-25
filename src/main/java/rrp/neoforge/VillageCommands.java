@@ -32,6 +32,7 @@ final class VillageCommands {
         Commands.register("territory", VillageCommands::territory);
         Commands.register("caravan", VillageCommands::caravan);
         Commands.register("diplomacy", VillageCommands::diplomacy);
+        Commands.register("regiment", VillageCommands::regiment);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -252,6 +253,19 @@ final class VillageCommands {
         }
         var stage = rrp.neoforge.ExploitationWatcher.incident(src.getLevel(), owner, intruder, RrpMod.simConfig(), RrpMod.registry());
         Commands.reply(src, RrpMod.lang().msg("territory.incident", owner.id(), intruder.id(), stage.name()));
+    }
+
+    /** {@code regiment} : régiments mobilisés (effectif, force, équipement, cible). */
+    private static void regiment(CommandSourceStack src, String[] args) {
+        var lang = RrpMod.lang();
+        var forces = MobilizationService.forces();
+        if (forces.isEmpty()) {
+            Commands.reply(src, lang.msg("mobilization.none"));
+        }
+        for (var f : forces) {
+            Commands.reply(src, lang.msg("mobilization.line", f.village(), f.size(), Math.round(f.strength() * 10) / 10.0,
+                    f.loadout().swords(), f.loadout().armors(), f.loadout().bows(), f.enemy()));
+        }
     }
 
     /** {@code diplomacy [evaluate]} : états diplomatiques des couples ; {@code evaluate} force une évaluation. */

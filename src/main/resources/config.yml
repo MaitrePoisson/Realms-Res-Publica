@@ -197,6 +197,16 @@ diplomacy_war_delay_s: 30
 diplomacy_calm_gain: 25
 # Stock de vivres sous lequel une ville est en penurie critique. [0 ; 100000]
 diplomacy_critical_food: 10
+# Delai entre deux mises a jour des regiments (mobilisation, equipement, marche). 0 = desactive. [0 ; 100000]
+mobilization_interval_s: 10
+# Part maximale de la population mobilisable en regiment. [0 ; 1]
+mobilization_share: 0.5
+# Fer pris a l'entrepot pour forger une epee. [0 ; 100]
+mobilization_sword_ore: 2
+# Fer pris a l'entrepot pour forger une armure. [0 ; 100]
+mobilization_armor_ore: 4
+# Bois pris a l'entrepot pour fabriquer un arc. [0 ; 100]
+mobilization_bow_wood: 2
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
