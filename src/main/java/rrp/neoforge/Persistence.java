@@ -90,6 +90,14 @@ public final class Persistence {
             tre.add(r);
         });
         root.add("treaties", tre);
+        JsonArray tri = new JsonArray();
+        WarResolution.tributaries().forEach((loser, winner) -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("loser", loser);
+            r.addProperty("winner", winner);
+            tri.add(r);
+        });
+        root.add("tributaries", tri);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(FILE + ".tmp");
@@ -109,6 +117,7 @@ public final class Persistence {
         registry.clear();
         RelationService.matrix().clear();
         DiplomacyService.treaties().clear();
+        WarResolution.clearTributaries();
         registry.consumeDirty();
         if (!Files.isRegularFile(file)) {
             return 0;
@@ -129,6 +138,12 @@ public final class Persistence {
                     JsonObject r = e.getAsJsonObject();
                     DiplomacyService.treaties().restore(r.get("pair").getAsString(),
                             rrp.core.diplomacy.Treaty.State.valueOf(r.get("state").getAsString()));
+                }
+            }
+            if (root.has("tributaries")) {
+                for (JsonElement e : root.getAsJsonArray("tributaries")) {
+                    JsonObject r = e.getAsJsonObject();
+                    WarResolution.restore(r.get("loser").getAsString(), r.get("winner").getAsString());
                 }
             }
             for (JsonElement e : root.getAsJsonArray("villages")) {

@@ -34,6 +34,7 @@ final class VillageCommands {
         Commands.register("diplomacy", VillageCommands::diplomacy);
         Commands.register("regiment", VillageCommands::regiment);
         Commands.register("siege", VillageCommands::siege);
+        Commands.register("war", VillageCommands::war);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -281,6 +282,22 @@ final class VillageCommands {
                 Commands.reply(src, lang.msg("siege.line", s.attacker(), s.defender(), m.kind(), Math.round(m.hp()),
                         s.budget().used(), s.budget().cap()));
             }
+        }
+    }
+
+    /** {@code war} : guerres en cours, villages tributaires et issues passées. */
+    private static void war(CommandSourceStack src, String[] args) {
+        var lang = RrpMod.lang();
+        var ages = WarResolution.ages();
+        var tributaries = WarResolution.tributaries();
+        var history = WarResolution.history();
+        if (ages.isEmpty() && tributaries.isEmpty() && history.isEmpty()) {
+            Commands.reply(src, lang.msg("war.none"));
+        }
+        ages.forEach((pair, age) -> Commands.reply(src, lang.msg("war.line", pair.replace('|', '/'), Math.round(age))));
+        tributaries.forEach((loser, winner) -> Commands.reply(src, lang.msg("war.tributary", loser, winner)));
+        for (var r : history) {
+            Commands.reply(src, lang.msg("war.result", r.winner(), r.loser(), r.kind(), r.loot()));
         }
     }
 

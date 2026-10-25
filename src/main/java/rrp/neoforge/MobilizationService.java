@@ -57,6 +57,17 @@ public final class MobilizationService {
 
     public static synchronized List<Force> forces() { return new ArrayList<>(FORCES.values()); }
 
+    /** Soldats du régiment encore vivants. */
+    public static int alive(Force f, ServerLevel level) {
+        int n = 0;
+        for (UUID id : f.members) {
+            if (level.getEntity(id) instanceof Villager v && v.isAlive()) {
+                n++;
+            }
+        }
+        return n;
+    }
+
     public static Regiment.Costs costs(SimConfig cfg) {
         return new Regiment.Costs((int) cfg.get(SimConfig.Key.MOBILIZATION_SWORD_ORE),
                 (int) cfg.get(SimConfig.Key.MOBILIZATION_ARMOR_ORE), (int) cfg.get(SimConfig.Key.MOBILIZATION_BOW_WOOD));

@@ -115,6 +115,7 @@ public final class RrpMod {
         DiplomacyService.onTicks(t, simConfig, REGISTRY);
         MobilizationService.onTicks(t, simConfig, REGISTRY);
         SiegeService.onTicks(t, simConfig, REGISTRY);
+        WarResolution.onTicks(t, simConfig, REGISTRY);
         ExploitationWatcher.onTicks(t, simConfig);
         persistence.onTicks(t, simConfig.get(SimConfig.Key.PERSISTENCE_FLUSH_S), adapter::saveAll);
     };

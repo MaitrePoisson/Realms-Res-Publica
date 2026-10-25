@@ -51,10 +51,11 @@ public final class TerritoryService {
             if (s.doctrine() != null && s.state().faction() != Faction.DISSIDENT) {
                 r = Math.max(1, (int) Math.round(r * s.doctrine().claimRadiusFactor()));
             }
-            map.put(new InfluenceMap.Marker(s.id(), s.id(), ChunkPos.ofBlock(bx, bz), r, 1.0));
+            String owner = WarResolution.ownerOf(s.id());
+            map.put(new InfluenceMap.Marker(s.id(), owner, ChunkPos.ofBlock(bx, bz), r, 1.0));
             if (s.defense().started()) {
                 for (int[] t : s.defense().towers()) {
-                    map.put(new InfluenceMap.Marker(s.id() + "#t" + t[0] + "," + t[2], s.id(),
+                    map.put(new InfluenceMap.Marker(s.id() + "#t" + t[0] + "," + t[2], owner,
                             ChunkPos.ofBlock(t[0], t[2]), Math.max(1, outR - 1), 0.3));
                 }
             }

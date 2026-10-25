@@ -229,6 +229,30 @@ siege_catapult_range: 24
 siege_defender_range: 12
 # Points de vie retires a une machine par defenseur a portee et par mise a jour. [0 ; 1000]
 siege_defender_damage: 10
+# Delai entre deux examens des guerres en cours. 0 = desactive. [0 ; 100000]
+war_resolve_interval_s: 10
+# Duree minimale d'une guerre avant toute resolution (s). [0 ; 100000]
+war_resolve_min_s: 60
+# Duree maximale d'une guerre : au-dela, le verdict tombe (s). [0 ; 1000000]
+war_resolve_max_s: 600
+# Rapport de puissance a partir duquel le vainqueur pille (en dessous : repli). [1 ; 100]
+war_pillage_at: 1.2
+# Rapport de puissance a partir duquel le vainqueur annexe le vaincu et leve un tribut. [1 ; 100]
+war_annex_at: 2
+# Rapport de puissance a partir duquel (breche pleine) l'hotel de ville du vaincu est detruit. [1 ; 100]
+war_destroy_at: 3
+# Part de chaque stock de l'entrepot du vaincu emportee par un pillage. [0 ; 1]
+war_loot_share: 0.3
+# Plafond d'un pillage, par ressource. [0 ; 100000]
+war_loot_cap: 64
+# Part de chaque stock versee en tribut par un village annexe a chaque echeance. [0 ; 1]
+war_tribute_share: 0.1
+# Plafond d'un versement de tribut, par ressource. [0 ; 100000]
+war_tribute_cap: 32
+# Intervalle entre deux versements de tribut (s, un jour de jeu). 0 = desactive. [0 ; 1000000]
+war_tribute_period_s: 1200
+# Indice de relation regagne par le couple au cessez-le-feu. [0 ; 200]
+war_peace_gain: 30
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]

@@ -988,4 +988,60 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void warresolution(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.MOBILIZATION_INTERVAL_S, 0)
+                    .with(rrp.core.SimConfig.Key.WAR_LOOT_CAP, 20).with(rrp.core.SimConfig.Key.WAR_TRIBUTE_CAP, 10)
+                    .with(rrp.core.SimConfig.Key.WAR_TRIBUTE_SHARE, 0.5));
+            var cfg = RrpMod.simConfig();
+            rrp.neoforge.DiplomacyService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.SiegeService.reset();
+            rrp.neoforge.WarResolution.reset();
+            setAll(h, Role.GUARD);
+            BlockPos bp = barrel(h, 18, 18, 0);
+            VillageSite b = RrpMod.registry().create(a.worldName(), bp.getX(), bp.getY(), bp.getZ(), 5);
+            h.assertTrue(RrpMod.warehouse().set(b, level, bp), "second warehouse");
+            Container bb = (Container) level.getBlockEntity(bp);
+            for (int i = 0; i < 4; i++) {
+                bb.setItem(i, new ItemStack(Items.BREAD, 50));
+            }
+            RrpMod.warehouse().refresh(a, level);
+            RrpMod.warehouse().refresh(b, level);
+            rrp.neoforge.DiplomacyService.open(a.id(), b.id(), RrpMod.registry());
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.MobilizationService.force(a.id()) != null, "a regiment is mobilised");
+            double rel = rrp.neoforge.RelationService.index(a, b, cfg);
+            var r = rrp.neoforge.WarResolution.resolve(a, b, cfg, RrpMod.registry());
+            h.assertTrue(r.winner().equals(a.id()) && r.kind() == rrp.core.diplomacy.WarOutcome.Kind.ANNEXATION,
+                    "an unopposed regiment annexes: " + r);
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.PEACE,
+                    "ceasefire after the verdict");
+            h.assertTrue(rrp.neoforge.RelationService.index(a, b, cfg) > rel, "relation partly restored");
+            h.assertTrue(a.id().equals(rrp.neoforge.WarResolution.ownerOf(b.id())), "claims transferred to the winner");
+            int foodA = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            int foodB = RrpMod.warehouse().read(b, level).getOrDefault(Resource.FOOD, 0);
+            int paid = rrp.neoforge.WarResolution.payTribute(cfg, RrpMod.registry());
+            int foodA2 = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            int foodB2 = RrpMod.warehouse().read(b, level).getOrDefault(Resource.FOOD, 0);
+            h.assertTrue(paid > 0 && paid <= 10 * 4 && foodA2 > foodA && foodB2 < foodB,
+                    "tribute moves stock to the winner within the cap: " + paid);
+            int loot = rrp.neoforge.WarResolution.pillage(a, b, cfg);
+            int foodB3 = RrpMod.warehouse().read(b, level).getOrDefault(Resource.FOOD, 0);
+            h.assertTrue(loot > 0 && loot <= 20 * 4 && foodB3 < foodB2, "pillage takes a capped share: " + loot);
+        } finally {
+            rrp.neoforge.WarResolution.reset();
+            rrp.neoforge.SiegeService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.DiplomacyService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
 }
