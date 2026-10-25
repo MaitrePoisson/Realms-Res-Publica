@@ -33,6 +33,7 @@ final class VillageCommands {
         Commands.register("caravan", VillageCommands::caravan);
         Commands.register("diplomacy", VillageCommands::diplomacy);
         Commands.register("regiment", VillageCommands::regiment);
+        Commands.register("siege", VillageCommands::siege);
         Commands.register("inspect", VillageCommands::inspect);
         Commands.register("setrole", VillageCommands::setRole);
     }
@@ -265,6 +266,21 @@ final class VillageCommands {
         for (var f : forces) {
             Commands.reply(src, lang.msg("mobilization.line", f.village(), f.size(), Math.round(f.strength() * 10) / 10.0,
                     f.loadout().swords(), f.loadout().armors(), f.loadout().bows(), f.enemy()));
+        }
+    }
+
+    /** {@code siege} : machines de siège en action et brèches ouvertes. */
+    private static void siege(CommandSourceStack src, String[] args) {
+        var lang = RrpMod.lang();
+        var sieges = SiegeService.sieges();
+        if (sieges.isEmpty()) {
+            Commands.reply(src, lang.msg("siege.none"));
+        }
+        for (var s : sieges) {
+            for (var m : s.machines()) {
+                Commands.reply(src, lang.msg("siege.line", s.attacker(), s.defender(), m.kind(), Math.round(m.hp()),
+                        s.budget().used(), s.budget().cap()));
+            }
         }
     }
 

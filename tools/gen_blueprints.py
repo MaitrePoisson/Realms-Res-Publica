@@ -1,4 +1,4 @@
-"""Generates the building blueprint pool (11 kinds x 5 biome families) as gzip NBT structure files.
+"""Generates the building blueprint pool (13 kinds x 5 biome families) as gzip NBT structure files.
 Usage: python tools/gen_blueprints.py [output_dir]   (default: src/main/resources/data/respublica/structure)
 Deterministic: same output on every run. Origin y=0 is the floor layer; the door is in the z=0 wall."""
 import gzip, os, struct, sys
@@ -170,10 +170,38 @@ def brewery(st):
     b.put(3, 1, 1, "bookshelf"); b.put(2, 3, 2, "torch")
     return b
 
+def ax(st, a): return {} if st["log"] == "cut_sandstone" else {"axis": a}
+
+def ram(st):
+    """Battering ram: a plank shed on fence wheels with a log hanging inside; the ram points along +z."""
+    b = Bp(3, 4, 5, st)
+    b.fill(0, 0, 0, 2, 0, 4, "minecraft:air")
+    for x in (0, 2):
+        for z in (0, 4): b.put(x, 0, z, "fence")
+    b.fill(0, 1, 0, 2, 1, 4, "plank")
+    for x in (0, 2):
+        for z in (0, 4): b.put(x, 2, z, "log", **ax(st, "y"))
+    b.fill(0, 3, 0, 2, 3, 4, "slab")
+    b.fill(1, 2, 0, 1, 2, 4, "log", **ax(st, "z"))
+    return b
+
+def catapult(st):
+    """Catapult: plank base on fence wheels, a log frame and a throwing arm of fence ending in a bowl."""
+    b = Bp(3, 4, 4, st)
+    for x in (0, 2):
+        for z in (0, 3): b.put(x, 0, z, "fence")
+    b.fill(0, 1, 0, 2, 1, 3, "plank")
+    b.fill(0, 2, 1, 0, 3, 1, "log", **ax(st, "y")); b.fill(2, 2, 1, 2, 3, 1, "log", **ax(st, "y"))
+    b.put(1, 3, 1, "log", **ax(st, "x"))
+    b.put(1, 2, 2, "fence"); b.put(1, 3, 2, "fence"); b.put(1, 2, 0, "fence")
+    b.put(1, 3, 3, "plank")
+    return b
+
 KINDS = {
     "house": lambda st: hut(st, 7, 7, 4, 2),
     "big_house": lambda st: hut(st, 9, 9, 4, 4),
     "farm": farm, "workshop": workshop, "watchtower": tower, "wall_segment": wall, "gate": gate,
+    "ram": ram, "catapult": catapult,
     "market": market, "barracks": barracks, "monument": monument, "brewery": brewery,
 }
 

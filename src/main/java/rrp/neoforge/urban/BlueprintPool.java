@@ -19,7 +19,8 @@ public final class BlueprintPool {
     public enum Kind {
         HOUSE("house"), BIG_HOUSE("big_house"), FARM("farm"), WORKSHOP("workshop"),
         WATCHTOWER("watchtower"), WALL_SEGMENT("wall_segment"), GATE("gate"),
-        MARKET("market"), BARRACKS("barracks"), MONUMENT("monument"), BREWERY("brewery");
+        MARKET("market"), BARRACKS("barracks"), MONUMENT("monument"), BREWERY("brewery"),
+        RAM("ram"), CATAPULT("catapult");
 
         private final String file;
 

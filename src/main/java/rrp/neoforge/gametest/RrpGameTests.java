@@ -901,4 +901,91 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void siege(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.MOBILIZATION_INTERVAL_S, 0)
+                    .with(rrp.core.SimConfig.Key.SIEGE_INTERVAL_S, 0).with(rrp.core.SimConfig.Key.SIEGE_STANDOFF, 4)
+                    .with(rrp.core.SimConfig.Key.SIEGE_BLOCK_CAP, 5));
+            var cfg = RrpMod.simConfig();
+            rrp.neoforge.DiplomacyService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.SiegeService.reset();
+            int n = 0;
+            for (Villager v : level.getEntitiesOfClass(Villager.class, h.getBounds())) {
+                RrpMod.adapter().setRole(v, n++ % 2 == 0 ? Role.GUARD : Role.BUILDER);
+            }
+            Container ba = (Container) h.getBlockEntity(new BlockPos(14, 1, 14));
+            ba.setItem(2, new ItemStack(Items.OAK_LOG, 40));
+            RrpMod.warehouse().refresh(a, level);
+            VillageSite b = RrpMod.registry().create(a.worldName(), a.x(), a.y(), a.z() - 8, 5);
+            int y = h.absolutePos(new BlockPos(0, 1, 0)).getY();
+            int ax = (int) Math.floor(a.x());
+            int az = (int) Math.floor(a.z());
+            for (BlockPos p : BlockPos.betweenClosed(h.absolutePos(new BlockPos(0, -2, 0)), h.absolutePos(new BlockPos(20, 8, 20)))) {
+                if (level.getBlockState(p).is(Blocks.STONE)) {
+                    level.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+            BlockPos door = new BlockPos(ax, y, az - 6);
+            level.setBlock(door, Blocks.OAK_DOOR.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.DoorBlock.HALF,
+                            net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER), 3);
+            level.setBlock(door.above(), Blocks.OAK_DOOR.defaultBlockState()
+                    .setValue(net.minecraft.world.level.block.DoorBlock.HALF,
+                            net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER), 3);
+            for (int x = ax - 4; x <= ax + 4; x++) {
+                level.setBlock(new BlockPos(x, y, az - 7), Blocks.COBBLESTONE.defaultBlockState(), 3);
+                level.setBlock(new BlockPos(x, y + 1, az - 7), Blocks.COBBLESTONE.defaultBlockState(), 3);
+            }
+            rrp.neoforge.SiegeService.update(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.SiegeService.siege(a.id()) == null, "no siege at peace");
+            rrp.neoforge.DiplomacyService.open(a.id(), b.id(), RrpMod.registry());
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            rrp.neoforge.SiegeService.update(cfg, RrpMod.registry());
+            var s = rrp.neoforge.SiegeService.siege(a.id());
+            h.assertTrue(s != null && s.machines().size() == 1
+                    && s.machines().get(0).kind() == rrp.core.diplomacy.Siege.Kind.RAM, "the ram is assembled first");
+            h.assertTrue(level.getBlockState(door).isAir() && level.getBlockState(door.above()).isAir(), "the ram broke the door");
+            h.assertTrue(s.budget().used() == 2, "a door costs two blocks of the cap: " + s.budget().used());
+            for (int i = 0; i < 12; i++) {
+                rrp.neoforge.SiegeService.update(cfg, RrpMod.registry());
+            }
+            boolean cat = false;
+            for (var m : s.machines()) {
+                cat |= m.kind() == rrp.core.diplomacy.Siege.Kind.CATAPULT;
+            }
+            h.assertTrue(cat, "the catapult is assembled after the ram");
+            int missing = 0;
+            for (int x = ax - 4; x <= ax + 4; x++) {
+                for (int dy = 0; dy < 2; dy++) {
+                    missing += level.getBlockState(new BlockPos(x, y + dy, az - 7)).isAir() ? 1 : 0;
+                }
+            }
+            h.assertTrue(s.budget().used() == 5 && s.breaches().size() == 5, "cap reached, never beyond: " + s.budget().used());
+            h.assertTrue(missing == 3, "the catapult breached the rampart within the cap: " + missing);
+            var ram = s.machines().get(0);
+            var origin = ram.origin();
+            h.assertTrue(rrp.neoforge.SiegeService.strike(a.id(), rrp.core.diplomacy.Siege.Kind.RAM, 100, level), "ram hit");
+            h.assertTrue(level.getBlockState(origin.above()).isAir(), "destroyed ram leaves no blocks");
+            h.assertTrue(s.machines().size() == 1, "only the catapult is left");
+            rrp.neoforge.SiegeService.update(cfg, RrpMod.registry());
+            h.assertTrue(s.machines().size() == 1, "no new ram once the cap is spent");
+            rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.PEACE);
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry());
+            rrp.neoforge.SiegeService.update(cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.SiegeService.siege(a.id()) == null, "siege lifted at peace");
+        } finally {
+            rrp.neoforge.SiegeService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.DiplomacyService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
 }

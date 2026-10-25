@@ -207,6 +207,28 @@ mobilization_sword_ore: 2
 mobilization_armor_ore: 4
 # Bois pris a l'entrepot pour fabriquer un arc. [0 ; 100]
 mobilization_bow_wood: 2
+# Delai entre deux mises a jour des sieges (assemblage, tirs, degats des defenseurs). 0 = desactive. [0 ; 100000]
+siege_interval_s: 10
+# Distance (blocs) entre l'hotel de ville ennemi et le point d'assemblage des machines. [4 ; 200]
+siege_standoff: 18
+# Nombre maximal de blocs detruits par un siege (belier + catapulte). [0 ; 1000]
+siege_block_cap: 12
+# Points de vie du belier. [1 ; 10000]
+siege_ram_hp: 40
+# Points de vie de la catapulte. [1 ; 10000]
+siege_catapult_hp: 30
+# Bois pris a l'entrepot de l'attaquant pour assembler un belier. [0 ; 1000]
+siege_ram_wood: 8
+# Bois pris a l'entrepot de l'attaquant pour assembler une catapulte. [0 ; 1000]
+siege_catapult_wood: 12
+# Portee (blocs) du belier : portes et portails en bois. [1 ; 100]
+siege_ram_range: 8
+# Portee (blocs) de la catapulte : blocs de rempart. [1 ; 100]
+siege_catapult_range: 24
+# Distance (blocs) a laquelle un defenseur peut attaquer une machine. [1 ; 100]
+siege_defender_range: 12
+# Points de vie retires a une machine par defenseur a portee et par mise a jour. [0 ; 1000]
+siege_defender_damage: 10
 # Lits libres que les bâtisseurs cherchent à garder en réserve (sans lit libre, aucune naissance). [0 ; 20]
 builder_spare_beds: 2
 # Loyauté gagnée par un villageois quand le diplomate, sans village voisin, lui parle. [0 ; 50]
