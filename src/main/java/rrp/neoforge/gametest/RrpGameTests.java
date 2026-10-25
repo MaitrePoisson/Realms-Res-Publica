@@ -110,7 +110,9 @@ public final class RrpGameTests {
         }
         BlockPos b = barrel(h, 14, 14, bread);
         RrpMod.scanner().scanNow();
-        VillageSite site = RrpMod.registry().all().stream().findFirst().orElse(null);
+        // arenas share the world: take the village nearest to this arena, not whichever the registry lists first
+        VillageSite site = RrpMod.registry().all().stream()
+                .min(java.util.Comparator.comparingDouble(v -> Math.hypot(v.x() - b.getX(), v.z() - b.getZ()))).orElse(null);
         h.assertTrue(site != null, "no village created by the scan");
         RrpMod.warehouse().set(site, h.getLevel(), b);
         RrpMod.warehouse().refresh(site, h.getLevel());
@@ -535,6 +537,8 @@ public final class RrpGameTests {
         // intruder's hall is far away; a neighbour owns the arena's chunk
         BlockPos far = h.absolutePos(new BlockPos(320, 2, 12));
         site.setHall(far.getX(), far.getY(), far.getZ());
+        // pinned: the doctrine otherwise follows the (random) biome of the arena and a warlike one trespasses on purpose
+        site.setDoctrine(rrp.core.territory.Doctrine.ISOLATIONIST_THEOCRACY);
         BlockPos ownerHall = h.absolutePos(new BlockPos(60, 2, 12));
         VillageSite owner = RrpMod.registry().create(site.worldName(), ownerHall.getX(), ownerHall.getY(), ownerHall.getZ(), 5);
         owner.setHall(ownerHall.getX(), ownerHall.getY(), ownerHall.getZ());

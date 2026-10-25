@@ -47,8 +47,9 @@ for pat in "Commandes disponibles" "config.yml relu" "Sous-commande inconnue" "U
            "Rôle changé : Diplomate" "Diplomate — satiété" "Villageois : 2, lits : 1" "villages.json écrit" "Naissance au village village-1" "Stock : Nourriture" "Villageois : 2, lits : 3" "Actions de rôle forcées à village-1 : 1 villageois" "FORESTER_OK" "MINER_OK" "GUARD_OK"; do
   grep -q "$pat" "$LOG" || { echo "SERVER: phase 1 reply missing: $pat"; exit 1; }
 done
-[ "$(grep -c "Actions de rôle forcées" "$LOG")" = 7 ] && ! grep "Actions de rôle forcées" "$LOG" | sed 6d | grep -q ": 0 villageois" || { echo "SERVER: a role did not act on village act"; grep "Actions de rôle" "$LOG"; exit 1; }
-# (the 6th act is the builder: it correctly does nothing while beds >= population + spare)
+[ "$(grep -c "Actions de rôle forcées" "$LOG")" = 7 ] && ! grep "Actions de rôle forcées" "$LOG" | sed '5,6d' | grep -q ": 0 villageois" || { echo "SERVER: a role did not act on village act"; grep "Actions de rôle" "$LOG"; exit 1; }
+# (the 5th act is the steward, which only feeds the hungry: depends on the real-time satiety; the 6th is the builder, which
+# acts only while beds < population + spare: neither is a fixed outcome, so only the other acts are required to act)
 # gauges must have moved after the accelerated ticks (first vs last status line)
 [ "$(grep 'Moyennes' "$LOG" | sed -n 1p | cut -d- -f2-)" != "$(grep 'Moyennes' "$LOG" | tail -n1 | cut -d- -f2-)" ] || { echo "SERVER: gauges did not evolve after rrp tick"; exit 1; }
 [ -s run/rrp-test-world/respublica/villages.json ] || { echo "SERVER: villages.json missing from the world folder"; exit 1; }
