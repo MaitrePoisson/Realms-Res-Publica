@@ -59,6 +59,18 @@ public final class VillageSite {
     public void setLodInactiveTicks(long t) { this.lodInactiveTicks = t; }
     public rrp.core.abstractsim.Lod lodForced() { return lodForced; }
     public void setLodForced(rrp.core.abstractsim.Lod l) { this.lodForced = l; }
+    /** Stock when the village went abstract (not persisted), or null while it is ACTIVE; the diff is reconciled on wake-up. */
+    private java.util.Map<rrp.core.Resource, Integer> abstractBaseline;
+    /** Births made while abstract that still have to be materialised as babies. */
+    private int pendingBirths;
+    private long abstractClock;
+
+    public java.util.Map<rrp.core.Resource, Integer> abstractBaseline() { return abstractBaseline; }
+    public void setAbstractBaseline(java.util.Map<rrp.core.Resource, Integer> b) { this.abstractBaseline = b; }
+    public int pendingBirths() { return pendingBirths; }
+    public void setPendingBirths(int n) { this.pendingBirths = Math.max(0, n); }
+    public long abstractClock() { return abstractClock; }
+    public void setAbstractClock(long t) { this.abstractClock = t; }
     public boolean isAbstract() { return lod == rrp.core.abstractsim.Lod.ABSTRACT; }
 
     public VillageState state() { return state; }

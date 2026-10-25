@@ -37,6 +37,7 @@ public final class RrpMod {
     private static VillageScanner scanner;
     private static GaugeTicker gauges;
     private static ActivityTracker activity;
+    private static AbstractService abstractEconomy;
     private static BirthService births;
     private static ActionBarService actionBar;
     private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
@@ -67,6 +68,7 @@ public final class RrpMod {
     public static VillageScanner scanner() { return scanner; }
     public static GaugeTicker gauges() { return gauges; }
     public static ActivityTracker activity() { return activity; }
+    public static AbstractService abstractEconomy() { return abstractEconomy; }
     public static BirthService births() { return births; }
     public static ActionBarService actionBar() { return actionBar; }
     public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
@@ -100,6 +102,7 @@ public final class RrpMod {
         adapter = new VillagerAdapter(RrpMod::simConfig, RrpMod::server, REGISTRY);
         scanner = new VillageScanner(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         activity = new ActivityTracker(RrpMod::simConfig, RrpMod::server, REGISTRY);
+        abstractEconomy = new AbstractService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
         gauges = new GaugeTicker(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         births = new BirthService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE);
         actionBar = new ActionBarService(RrpMod::simConfig, RrpMod::server, REGISTRY, RrpMod::lang);
@@ -116,6 +119,7 @@ public final class RrpMod {
     private static final java.util.function.LongConsumer worldTimer = t -> {
         scanner.onTicks(t);
         activity.onTicks(t);
+        abstractEconomy.onTicks(t);
         gauges.onTicks(t);
         actionBar.onTicks(t);
         births.onTicks(t);

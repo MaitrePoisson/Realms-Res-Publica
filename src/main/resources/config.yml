@@ -107,6 +107,20 @@ lod_enabled: 1
 lod_check_ticks: 100
 # Seconds a village must stay out of every active chunk before it turns abstract (becoming active again is immediate). [0 ; 3600]
 lod_grace_s: 30
+# Ticks of one abstract-economy step for villages that are not loaded (longer gaps are caught up in at most abstract_max_chunks chunks). [20 ; 1200000]
+abstract_step_ticks: 1200
+# Maximum number of chunks used to catch up one long gap of an abstract village. [1 ; 1000]
+abstract_max_chunks: 48
+# Chance that a working villager of an abstract village succeeds at each work interval. [0 ; 1]
+abstract_work_success: 0.7
+# Food units per successful farmer action in an abstract village (multiplied by the biome yield). [0 ; 100]
+abstract_yield_food: 2.0
+# Wood units per successful forester action in an abstract village. [0 ; 100]
+abstract_yield_wood: 2.5
+# Ore units per successful miner action in an abstract village. [0 ; 100]
+abstract_yield_ore: 0.6
+# Stone units per successful miner action in an abstract village. [0 ; 100]
+abstract_yield_stone: 2.0
 # Relations gagnées à chaque visite réussie du diplomate. [0 ; 100]
 relations_per_visit: 5
 # Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]

@@ -1347,6 +1347,44 @@ public final class RrpGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void abstracteconomy(GameTestHelper h) {
+        VillageSite a = village(h, 6, 12, 40);
+        ServerLevel level = h.getLevel();
+        try {
+            var villagers = a.state().villagers();
+            for (int i = 0; i < villagers.size(); i++) {
+                villagers.get(i).setRole(i < 3 ? rrp.core.Role.FARMER : rrp.core.Role.FORESTER);
+            }
+            h.assertTrue(RrpMod.warehouse().read(a, level).getOrDefault(rrp.core.Resource.FOOD, 0) == 40, "start food 40");
+            a.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            RrpMod.activity().evaluate(a, 0);
+            h.assertTrue(a.isAbstract() && a.abstractBaseline() != null, "asleep with a baseline");
+            int births = RrpMod.abstractEconomy().advance(a, 20L * 400);
+            int wood = a.state().stock(rrp.core.Resource.WOOD);
+            int food = a.state().stock(rrp.core.Resource.FOOD);
+            h.assertTrue(wood > 20 && wood < 400, "abstract foresters produced wood: " + wood);
+            h.assertTrue(births == a.pendingBirths() && births > 0, "abstract births recorded: " + births);
+            h.assertTrue(RrpMod.warehouse().read(a, level).getOrDefault(rrp.core.Resource.WOOD, 0) == 0,
+                    "the real warehouse is untouched while abstract");
+            a.setLodForced(rrp.core.abstractsim.Lod.ACTIVE);
+            RrpMod.activity().evaluate(a, 0);
+            var real = RrpMod.warehouse().read(a, level);
+            h.assertTrue(!a.isAbstract() && a.abstractBaseline() == null, "awake, ledger cleared");
+            h.assertTrue(real.getOrDefault(rrp.core.Resource.WOOD, 0) == wood, "wood reconciled exactly: " + real + " vs " + wood);
+            h.assertTrue(real.getOrDefault(rrp.core.Resource.FOOD, 0) == food, "food reconciled exactly: " + real + " vs " + food);
+            int babies = RrpMod.births().countBabies(a, level);
+            h.assertTrue(babies == Math.min(births, 12 - 6), "babies materialised: " + babies);
+            for (var v : level.getEntitiesOfClass(net.minecraft.world.entity.npc.Villager.class, h.getBounds().inflate(40), e -> e.isBaby())) {
+                v.discard();
+            }
+        } finally {
+            a.setLodForced(null);
+            a.setLod(rrp.core.abstractsim.Lod.ACTIVE);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void lodswitch(GameTestHelper h) {
         VillageSite a = village(h, 4, 4, 10);
         ServerLevel level = h.getLevel();

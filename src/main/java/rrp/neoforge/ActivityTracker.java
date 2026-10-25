@@ -44,18 +44,37 @@ public final class ActivityTracker {
     public Lod evaluate(VillageSite site, long elapsed) {
         SimConfig cfg = config.get();
         if (site.lodForced() != null) {
-            site.setLod(site.lodForced());
-            return site.lod();
+            return apply(site, site.lodForced(), true);
         }
         if (cfg.get(SimConfig.Key.LOD_ENABLED) < 1) {
-            site.setLod(Lod.ACTIVE);
-            return Lod.ACTIVE;
+            return apply(site, Lod.ACTIVE, true);
         }
         boolean live = live(site);
         site.setLodInactiveTicks(live ? 0 : site.lodInactiveTicks() + elapsed);
         long grace = (long) (cfg.get(SimConfig.Key.LOD_GRACE_S) * 20);
-        site.setLod(LodPolicy.next(site.lod(), live, site.lodInactiveTicks(), grace));
-        return site.lod();
+        return apply(site, LodPolicy.next(site.lod(), live, site.lodInactiveTicks(), grace), false);
+    }
+
+    /**
+     * Switches the village to {@code target}, running the abstract-economy hooks: remember the stock when it falls
+     * asleep, reconcile the warehouse when it wakes up. An automatic wake-up waits until the warehouse is readable.
+     */
+    private Lod apply(VillageSite site, Lod target, boolean forced) {
+        if (target == site.lod()) {
+            return target;
+        }
+        AbstractService abstractEconomy = RrpMod.abstractEconomy();
+        if (target == Lod.ABSTRACT) {
+            abstractEconomy.sleep(site);
+        } else {
+            ServerLevel w = Worlds.level(server.get(), site.worldName());
+            if (!forced && !abstractEconomy.canWake(site, w)) {
+                return site.lod();
+            }
+            abstractEconomy.wake(site, w);
+        }
+        site.setLod(target);
+        return target;
     }
 
     private boolean live(VillageSite site) {
