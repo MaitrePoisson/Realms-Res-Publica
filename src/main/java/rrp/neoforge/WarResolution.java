@@ -117,10 +117,18 @@ public final class WarResolution {
         if (age >= cfg.get(SimConfig.Key.WAR_RESOLVE_MAX_S)) {
             return true;
         }
+        if (!marchArrived(a) || !marchArrived(b)) { // an abstract army still on the road cannot have won yet
+            return false;
+        }
         var wa = side(a, cfg);
         var wb = side(b, cfg);
         boolean cap = wa.breachCap() > 0 && (wa.breaches() >= wa.breachCap() || wb.breaches() >= wb.breachCap());
         return cap || wa.strength() <= 0 || wb.strength() <= 0 || wa.aliveShare() <= 0 || wb.aliveShare() <= 0;
+    }
+
+    private static boolean marchArrived(VillageSite v) {
+        var f = MobilizationService.force(v.id());
+        return f == null || f.arrived();
     }
 
     /** Camp de {@code me} : sa force levée, ses survivants et les brèches qu'il a ouvertes chez son ennemi. */
@@ -131,7 +139,7 @@ public final class WarResolution {
         ServerLevel level = Worlds.level(RrpMod.server(), me.worldName());
         boolean loaded = level != null && me.hasHall()
                 && level.hasChunkAt(new net.minecraft.core.BlockPos(me.hall()[0], me.hall()[1], me.hall()[2]));
-        if (f != null && loaded && f.size() > 0) {
+        if (f != null && !f.isAbstract() && loaded && f.size() > 0) {
             alive = (double) MobilizationService.alive(f, level) / f.size();
         }
         var siege = SiegeService.siege(me.id());

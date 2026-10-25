@@ -121,6 +121,10 @@ abstract_yield_wood: 2.5
 abstract_yield_ore: 0.6
 # Stone units per successful miner action in an abstract village. [0 ; 100]
 abstract_yield_stone: 2.0
+# Blocks per second of an abstract army or caravan travelling as a point on the map. [0.1 ; 100]
+abstract_march_speed: 4.0
+# Speed multiplier of an abstract party whose route follows a laid road. [1 ; 10]
+abstract_road_factor: 2.0
 # Relations gagnées à chaque visite réussie du diplomate. [0 ; 100]
 relations_per_visit: 5
 # Bois (planches ou troncs) consommé dans l'entrepôt pour bâtir une hutte avec un lit. [4 ; 500]

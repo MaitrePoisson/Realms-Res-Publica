@@ -9,6 +9,8 @@ import java.util.Random;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.levelgen.Heightmap;
+import rrp.core.abstractsim.AbstractMarch;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.WanderingTrader;
@@ -39,6 +41,9 @@ public final class CaravanService {
         final boolean ambush;
         WanderingTrader trader;
         final List<Villager> escorts = new ArrayList<>();
+        /** Set while the caravan travels as a point on the map (no entity); null while it is physical. */
+        AbstractMarch march;
+        int abstractEscorts;
         Resource carried;
         int amount;
         int unsold;
@@ -57,7 +62,9 @@ public final class CaravanService {
         public String from() { return from; }
         public String to() { return to; }
         public boolean returning() { return returning; }
-        public int escorts() { return escorts.size(); }
+        public int escorts() { return Math.max(escorts.size(), abstractEscorts); }
+        public boolean isAbstract() { return trader == null && march != null; }
+        public AbstractMarch march() { return march; }
     }
 
     private static final List<Caravan> ACTIVE = new ArrayList<>();
@@ -150,12 +157,11 @@ public final class CaravanService {
         if (LawService.embargo(a.id(), b.id())) {
             return Optional.empty();
         }
-        if (level == null || !a.worldName().equals(b.worldName()) || !a.hasWarehouse() || !b.hasWarehouse()
-                || !WarehouseService.loaded(a, level) || !WarehouseService.loaded(b, level)) {
+        if (level == null || !a.worldName().equals(b.worldName()) || !ready(a, level) || !ready(b, level)) {
             return Optional.empty();
         }
-        RrpMod.warehouse().refresh(a, level);
-        RrpMod.warehouse().refresh(b, level);
+        refresh(a, level);
+        refresh(b, level);
         int surplus = (int) cfg.get(SimConfig.Key.CARAVAN_SURPLUS);
         int deficit = (int) cfg.get(SimConfig.Key.CARAVAN_DEFICIT);
         int load = (int) cfg.get(SimConfig.Key.CARAVAN_MAX_LOAD);
@@ -171,32 +177,82 @@ public final class CaravanService {
             return Optional.empty();
         }
         TradePlanner.Offer o = offer.get();
-        int taken = RrpMod.warehouse().withdraw(from, level, o.give(), o.giveAmount());
+        int taken = take(from, level, o.give(), o.giveAmount());
         if (taken <= 0) {
             return Optional.empty();
         }
+        int maxEscorts = (int) cfg.get(SimConfig.Key.CARAVAN_ESCORTS);
         List<Villager> guards = new ArrayList<>();
-        for (Villager v : RrpMod.adapter().present(from, level)) {
-            var st = RrpMod.adapter().stateOf(v);
-            if (st != null && st.role() == Role.GUARD && guards.size() < (int) cfg.get(SimConfig.Key.CARAVAN_ESCORTS)) {
-                guards.add(v);
+        int escortCount;
+        if (from.isAbstract()) {
+            escortCount = Math.min(maxEscorts, from.state().count(Role.GUARD));
+        } else {
+            for (Villager v : RrpMod.adapter().present(from, level)) {
+                var st = RrpMod.adapter().stateOf(v);
+                if (st != null && st.role() == Role.GUARD && guards.size() < maxEscorts) {
+                    guards.add(v);
+                }
             }
+            escortCount = guards.size();
         }
-        double chance = TradePlanner.ambushChance(cfg.get(SimConfig.Key.CARAVAN_AMBUSH_CHANCE), guards.size());
+        double chance = TradePlanner.ambushChance(cfg.get(SimConfig.Key.CARAVAN_AMBUSH_CHANCE), escortCount);
         Caravan c = new Caravan(from.id(), to.id(), new TradePlanner.Offer(o.give(), taken, o.get(), o.getAmount()),
                 RANDOM.nextDouble() < chance);
-        BlockPos start = warehousePos(from);
-        WanderingTrader t = new WanderingTrader(EntityType.WANDERING_TRADER, level);
-        t.moveTo(start.getX() + 0.5, start.getY() + 1, start.getZ() + 0.5);
-        t.setCustomName(Component.literal(RrpMod.lang().msg("caravan.name", from.id())));
-        t.setDespawnDelay(0);
-        level.addFreshEntity(t);
-        c.trader = t;
-        c.escorts.addAll(guards);
+        if (from.isAbstract()) {
+            c.march = AbstractRoutes.between(from, to, cfg);
+            c.abstractEscorts = escortCount;
+        } else {
+            spawnTrader(c, from, level);
+            c.escorts.addAll(guards);
+        }
         ACTIVE.add(c);
         RrpMod.crises().tell(from, RrpMod.lang().msg("caravan.depart", from.id(), to.id(), c.offer.give().label(), taken,
                 c.offer.get().label(), c.offer.getAmount()));
         return Optional.of(c);
+    }
+
+    private static void spawnTrader(Caravan c, VillageSite from, ServerLevel level) {
+        BlockPos start = warehousePos(from);
+        spawnTrader(c, from, level, start.getX() + 0.5, start.getY() + 1, start.getZ() + 0.5);
+    }
+
+    private static void spawnTrader(Caravan c, VillageSite from, ServerLevel level, double x, double y, double z) {
+        WanderingTrader t = new WanderingTrader(EntityType.WANDERING_TRADER, level);
+        t.moveTo(x, y, z);
+        t.setCustomName(Component.literal(RrpMod.lang().msg("caravan.name", from.id())));
+        t.setDespawnDelay(0);
+        level.addFreshEntity(t);
+        c.trader = t;
+    }
+
+    /** A village can take part in a trade when it is asleep (in-memory stock) or its warehouse is readable. */
+    private static boolean ready(VillageSite s, ServerLevel level) {
+        return s.isAbstract() || (s.hasWarehouse() && WarehouseService.loaded(s, level));
+    }
+
+    private static void refresh(VillageSite s, ServerLevel level) {
+        if (!s.isAbstract()) {
+            RrpMod.warehouse().refresh(s, level);
+        }
+    }
+
+    /** Takes goods from a village: the in-memory stock when it is ABSTRACT, its warehouse otherwise. */
+    private static int take(VillageSite s, ServerLevel level, Resource r, int n) {
+        if (s.isAbstract()) {
+            int t = Math.max(0, Math.min(n, s.state().stock(r)));
+            s.state().addStock(r, -t);
+            return t;
+        }
+        return RrpMod.warehouse().withdraw(s, level, r, n);
+    }
+
+    /** Puts goods into a village (in memory when ABSTRACT); returns the quantity refused. */
+    private static int put(VillageSite s, ServerLevel level, Resource r, int n) {
+        if (s.isAbstract()) {
+            s.state().addStock(r, n);
+            return 0;
+        }
+        return RrpMod.warehouse().deposit(s, level, stackOf(r, n)).getCount();
     }
 
     private static Map<Resource, Integer> stocks(VillageSite s) {
@@ -215,6 +271,10 @@ public final class CaravanService {
     private static void update(Caravan c, double seconds, SimConfig cfg, VillageRegistry registry) {
         VillageSite origin = registry.get(c.from);
         VillageSite dest = registry.get(c.to);
+        if (c.trader == null && c.march != null && origin != null && dest != null) {
+            updateAbstract(c, origin, dest, seconds, cfg);
+            return;
+        }
         if (origin == null || dest == null || c.trader == null || !c.trader.isAlive()) {
             fail(c, origin, dest, cfg, "caravan.lost");
             return;
@@ -226,6 +286,14 @@ public final class CaravanService {
         if (c.ambush && !c.returning && c.age >= timeout / 3) {
             ambushed++;
             fail(c, origin, dest, cfg, "caravan.ambush");
+            return;
+        }
+        if (target.isAbstract() && !inActiveArea(level, c.trader.getX(), c.trader.getZ(), 16)) {
+            // the party left every active area on its way to a sleeping village: it continues as a point on the map
+            c.march = AbstractRoutes.from(c.trader.getX(), c.trader.getZ(), c.returning ? dest : origin, target, cfg);
+            c.trader.discard();
+            c.trader = null;
+            c.escorts.clear();
             return;
         }
         BlockPos goal = warehousePos(target);
@@ -250,13 +318,59 @@ public final class CaravanService {
         }
     }
 
+    /** True when (x, z) lies inside the radius (+ margin) of a village whose chunks are live. */
+    private static boolean inActiveArea(ServerLevel level, double x, double z, double margin) {
+        for (VillageSite v : RrpMod.registry().all()) {
+            if (!v.isAbstract() && v.worldName().equals(Worlds.name(level))
+                    && Math.hypot(x - v.x(), z - v.z()) <= v.radius() + margin
+                    && level.hasChunk((int) Math.floor(x) >> 4, (int) Math.floor(z) >> 4)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** One step of a caravan travelling as a point: ambush, advance, materialise near live villages, trade. */
+    private static void updateAbstract(Caravan c, VillageSite origin, VillageSite dest, double seconds, SimConfig cfg) {
+        VillageSite target = c.returning ? origin : dest;
+        c.age += seconds;
+        double timeout = cfg.get(SimConfig.Key.CARAVAN_TIMEOUT_S);
+        if (c.ambush && !c.returning && c.age >= timeout / 3) {
+            ambushed++;
+            fail(c, origin, dest, cfg, "caravan.ambush");
+            return;
+        }
+        c.march.advance(seconds);
+        ServerLevel level = Worlds.level(RrpMod.server(), target.worldName());
+        if (level == null) {
+            return;
+        }
+        if (!c.march.arrived() && inActiveArea(level, c.march.x(), c.march.z(), 0)) {
+            int bx = (int) Math.floor(c.march.x());
+            int bz = (int) Math.floor(c.march.z());
+            spawnTrader(c, origin, level, bx + 0.5, level.getHeight(Heightmap.Types.MOTION_BLOCKING, bx, bz), bz + 0.5);
+            c.march = null;
+            return;
+        }
+        if (!c.march.arrived() || (!target.isAbstract() && !ready(target, level))) {
+            return;
+        }
+        c.age = 0;
+        if (!c.returning) {
+            trade(c, dest, level);
+            c.march = AbstractRoutes.between(dest, origin, cfg);
+        } else {
+            finish(c, origin, dest, level, cfg);
+        }
+    }
+
     /** À l'arrivée : la cargaison est vendue, la contrepartie est chargée. Ce qui ne rentre pas revient. */
     private static void trade(Caravan c, VillageSite dest, ServerLevel level) {
-        int refused = RrpMod.warehouse().deposit(dest, level, stackOf(c.offer.give(), c.amount)).getCount();
+        int refused = put(dest, level, c.offer.give(), c.amount);
         // si le partenaire manque de place, l'invendu revient et la contrepartie est réduite
         int sold = c.amount - refused;
         int wanted = refused == 0 ? c.offer.getAmount() : c.offer.getAmount() * sold / Math.max(1, c.amount);
-        int bought = RrpMod.warehouse().withdraw(dest, level, c.offer.get(), wanted);
+        int bought = take(dest, level, c.offer.get(), wanted);
         c.unsold = refused;
         c.carried = c.offer.get();
         c.amount = bought;
@@ -265,12 +379,14 @@ public final class CaravanService {
 
     private static void finish(Caravan c, VillageSite origin, VillageSite dest, ServerLevel level, SimConfig cfg) {
         if (c.amount > 0) {
-            RrpMod.warehouse().deposit(origin, level, stackOf(c.carried, c.amount));
+            put(origin, level, c.carried, c.amount);
         }
         if (c.unsold > 0) {
-            RrpMod.warehouse().deposit(origin, level, stackOf(c.offer.give(), c.unsold));
+            put(origin, level, c.offer.give(), c.unsold);
         }
-        c.trader.discard();
+        if (c.trader != null) {
+            c.trader.discard();
+        }
         ACTIVE.remove(c);
         completed++;
         RelationService.change(origin, dest, cfg.get(SimConfig.Key.CARAVAN_RELATION_GAIN), cfg);
@@ -294,14 +410,14 @@ public final class CaravanService {
     public static synchronized void abortAll(VillageRegistry registry) {
         for (Caravan c : new ArrayList<>(ACTIVE)) {
             VillageSite origin = registry.get(c.from);
-            if (origin != null && c.trader != null) {
+            if (origin != null && (c.trader != null || c.march != null)) {
                 ServerLevel level = Worlds.level(RrpMod.server(), origin.worldName());
-                if (level != null && WarehouseService.loaded(origin, level)) {
+                if (origin.isAbstract() || (level != null && WarehouseService.loaded(origin, level))) {
                     if (c.amount > 0) {
-                        RrpMod.warehouse().deposit(origin, level, stackOf(c.carried, c.amount));
+                        put(origin, level, c.carried, c.amount);
                     }
                     if (c.unsold > 0) {
-                        RrpMod.warehouse().deposit(origin, level, stackOf(c.offer.give(), c.unsold));
+                        put(origin, level, c.offer.give(), c.unsold);
                     }
                 }
             }

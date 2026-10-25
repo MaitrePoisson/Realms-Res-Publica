@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.server.level.ServerLevel;
+import rrp.core.abstractsim.AbstractMarch;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
@@ -30,6 +31,9 @@ public final class MobilizationService {
         final List<UUID> members = new ArrayList<>();
         Regiment.Loadout loadout;
         double strength;
+        /** Set for a regiment of an ABSTRACT village: a point on the map instead of entities. */
+        AbstractMarch march;
+        int abstractSize;
 
         Force(String village, String enemy) {
             this.village = village;
@@ -38,7 +42,11 @@ public final class MobilizationService {
 
         public String village() { return village; }
         public String enemy() { return enemy; }
-        public int size() { return members.size(); }
+        public int size() { return march != null ? abstractSize : members.size(); }
+        public boolean isAbstract() { return march != null; }
+        public AbstractMarch march() { return march; }
+        /** Physical regiments are always "there"; an abstract one has to finish its march. */
+        public boolean arrived() { return march == null || march.arrived(); }
         public Regiment.Loadout loadout() { return loadout; }
         public double strength() { return strength; }
     }
@@ -77,13 +85,18 @@ public final class MobilizationService {
         since += ticks / 20.0;
         double interval = cfg.get(SimConfig.Key.MOBILIZATION_INTERVAL_S);
         if (interval > 0 && since >= interval) {
+            double elapsed = since;
             since = 0;
-            update(cfg, registry);
+            update(cfg, registry, elapsed);
         }
     }
 
-    /** Lève, équipe, fait marcher ou démobilise les régiments de tous les villages. */
     public static synchronized void update(SimConfig cfg, VillageRegistry registry) {
+        update(cfg, registry, cfg.get(SimConfig.Key.MOBILIZATION_INTERVAL_S));
+    }
+
+    /** Lève, équipe, fait marcher ou démobilise les régiments de tous les villages. */
+    public static synchronized void update(SimConfig cfg, VillageRegistry registry, double elapsed) {
         if (RrpMod.server() == null) {
             return;
         }
@@ -100,16 +113,24 @@ public final class MobilizationService {
                 }
                 continue;
             }
+            if (f != null && f.isAbstract() != site.isAbstract()) { // the village changed level of detail: re-form
+                demobilize(f, site, level);
+                f = null;
+            }
             if (f == null || !f.enemy.equals(enemy.id())) {
                 if (f != null) {
                     demobilize(f, site, level);
                 }
-                f = form(site, enemy, level, cfg);
+                f = site.isAbstract() ? formAbstract(site, enemy, cfg) : form(site, enemy, level, cfg);
                 if (f == null) {
                     continue;
                 }
             }
-            march(f, enemy, level);
+            if (f.isAbstract()) {
+                f.march.advance(elapsed);
+            } else {
+                march(f, enemy, level);
+            }
         }
     }
 
@@ -161,6 +182,27 @@ public final class MobilizationService {
             }
         }
         f.strength = Regiment.strength(n, loadout);
+        FORCES.put(site.id(), f);
+        RrpMod.crises().tell(site, RrpMod.lang().msg("mobilization.formed", site.id(), n, enemy.id(),
+                Math.round(f.strength * 10) / 10.0));
+        return f;
+    }
+
+    /** Regiment of a sleeping village: sized and equipped from the in-memory state, then sent as a point on the map. */
+    private static Force formAbstract(VillageSite site, VillageSite enemy, SimConfig cfg) {
+        var st = site.state();
+        int n = Regiment.size(st.count(Role.GUARD), st.population(), LawService.conscription(site.id(), cfg));
+        if (n <= 0) {
+            return null;
+        }
+        var loadout = Regiment.equip(n, st.stock(Resource.ORE), st.stock(Resource.WOOD), costs(cfg));
+        st.addStock(Resource.ORE, -loadout.oreSpent());
+        st.addStock(Resource.WOOD, -loadout.woodSpent());
+        Force f = new Force(site.id(), enemy.id());
+        f.loadout = loadout;
+        f.abstractSize = n;
+        f.strength = Regiment.strength(n, loadout);
+        f.march = AbstractRoutes.between(site, enemy, cfg);
         FORCES.put(site.id(), f);
         RrpMod.crises().tell(site, RrpMod.lang().msg("mobilization.formed", site.id(), n, enemy.id(),
                 Math.round(f.strength * 10) / 10.0));

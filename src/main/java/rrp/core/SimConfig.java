@@ -74,6 +74,8 @@ public final class SimConfig {
         ABSTRACT_YIELD_WOOD(2.5, 0, 100),
         ABSTRACT_YIELD_ORE(0.6, 0, 100),
         ABSTRACT_YIELD_STONE(2.0, 0, 100),
+        ABSTRACT_MARCH_SPEED(4.0, 0.1, 100),
+        ABSTRACT_ROAD_FACTOR(2.0, 1, 10),
         RELATIONS_PER_VISIT(5, 0, 100),
         HUT_WOOD(30, 4, 500),
         TOWN_HALL_RADIUS(12, 4, 64),

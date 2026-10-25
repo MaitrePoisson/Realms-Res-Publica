@@ -1416,6 +1416,107 @@ public final class RrpGameTests {
     }
 
     @GameTest(template = ARENA)
+    public static void abstractcaravan(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        VillageSite b = null;
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.CARAVAN_AMBUSH_CHANCE, 0)
+                    .with(rrp.core.SimConfig.Key.CARAVAN_INTERVAL_S, 0));
+            var cfg = RrpMod.simConfig();
+            rrp.neoforge.CaravanService.reset();
+            b = RrpMod.registry().create(a.worldName(), (int) a.x() + 40, (int) a.y(), (int) a.z(), 5);
+            a.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            b.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            RrpMod.activity().evaluate(a, 0);
+            RrpMod.activity().evaluate(b, 0);
+            a.state().setStock(Resource.ORE, 120);
+            a.state().setStock(Resource.FOOD, 10);
+            b.state().setStock(Resource.FOOD, 200);
+            b.state().setStock(Resource.ORE, 5);
+            int oreB = b.state().stock(Resource.ORE);
+            int foodA = a.state().stock(Resource.FOOD);
+            var sent = rrp.neoforge.CaravanService.dispatch(a, b, cfg);
+            h.assertTrue(sent.isPresent() && sent.get().isAbstract(), "an abstract caravan leaves with no entity");
+            double eta = sent.get().march().etaSeconds();
+            h.assertTrue(Math.abs(eta - 40 / cfg.get(rrp.core.SimConfig.Key.ABSTRACT_MARCH_SPEED)) < 0.1, "ETA from distance and speed: " + eta);
+            h.assertTrue(a.state().stock(Resource.ORE) < 120, "cargo left the in-memory stock");
+            h.assertTrue(level(h).getEntitiesOfClass(net.minecraft.world.entity.npc.WanderingTrader.class, h.getBounds().inflate(80)).isEmpty(),
+                    "no trader entity while abstract");
+            rrp.neoforge.CaravanService.onTicks(20L * 5, cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.CaravanService.completed() == 0 && !sent.get().returning(), "still travelling after 5 s");
+            for (int i = 0; i < 3; i++) {
+                rrp.neoforge.CaravanService.onTicks(20L * 60, cfg, RrpMod.registry());
+            }
+            h.assertTrue(rrp.neoforge.CaravanService.completed() == 1 && rrp.neoforge.CaravanService.active() == 0, "caravan delivered");
+            h.assertTrue(b.state().stock(Resource.ORE) > oreB, "iron delivered to the sleeping partner");
+            h.assertTrue(a.state().stock(Resource.FOOD) > foodA, "wheat brought back to the sleeping origin");
+        } finally {
+            rrp.neoforge.CaravanService.reset();
+            a.setLodForced(null);
+            a.setLod(rrp.core.abstractsim.Lod.ACTIVE);
+            if (b != null) {
+                RrpMod.registry().remove(b.id());
+            }
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
+
+    private static ServerLevel level(GameTestHelper h) {
+        return h.getLevel();
+    }
+
+    @GameTest(template = ARENA)
+    public static void abstractwar(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        VillageSite b = null;
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.WAR_RESOLVE_MIN_S, 0));
+            var cfg = RrpMod.simConfig();
+            rrp.neoforge.DiplomacyService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.SiegeService.reset();
+            rrp.neoforge.WarResolution.reset();
+            setAll(h, Role.GUARD);
+            b = RrpMod.registry().create(a.worldName(), (int) a.x() + 80, (int) a.y(), (int) a.z(), 5);
+            a.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            b.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
+            RrpMod.activity().evaluate(a, 0);
+            RrpMod.activity().evaluate(b, 0);
+            rrp.neoforge.DiplomacyService.open(a.id(), b.id(), RrpMod.registry());
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry(), 1);
+            var f = rrp.neoforge.MobilizationService.force(a.id());
+            h.assertTrue(f != null && f.isAbstract() && f.size() > 0, "an abstract regiment is raised from the state");
+            h.assertTrue(!f.arrived() && f.march().etaSeconds() > 10, "it is still on the road: " + f.march().etaSeconds());
+            rrp.neoforge.WarResolution.update(10, cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.WAR,
+                    "the siege cannot resolve before the army arrives");
+            rrp.neoforge.MobilizationService.update(cfg, RrpMod.registry(), f.march().etaSeconds() + 1);
+            h.assertTrue(f.arrived(), "the regiment arrived");
+            rrp.neoforge.WarResolution.update(10, cfg, RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.PEACE,
+                    "the abstract war ended");
+            h.assertTrue(a.id().equals(rrp.neoforge.WarResolution.ownerOf(b.id())), "the unopposed army annexed its target");
+        } finally {
+            rrp.neoforge.WarResolution.reset();
+            rrp.neoforge.SiegeService.reset();
+            rrp.neoforge.MobilizationService.reset();
+            rrp.neoforge.DiplomacyService.reset();
+            a.setLodForced(null);
+            a.setLod(rrp.core.abstractsim.Lod.ACTIVE);
+            if (b != null) {
+                RrpMod.registry().remove(b.id());
+            }
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
     public static void politicalmap(GameTestHelper h) {
         VillageSite a = village(h, 4, 4, 10);
         ServerLevel level = h.getLevel();
