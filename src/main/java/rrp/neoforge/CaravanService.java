@@ -134,6 +134,9 @@ public final class CaravanService {
     /** Prépare et envoie une caravane si un troc est possible dans un sens ou dans l'autre. */
     public static synchronized Optional<Caravan> dispatch(VillageSite a, VillageSite b, SimConfig cfg) {
         ServerLevel level = Worlds.level(RrpMod.server(), a.worldName());
+        if (LawService.embargo(a.id(), b.id())) {
+            return Optional.empty();
+        }
         if (level == null || !a.worldName().equals(b.worldName()) || !a.hasWarehouse() || !b.hasWarehouse()
                 || !WarehouseService.loaded(a, level) || !WarehouseService.loaded(b, level)) {
             return Optional.empty();

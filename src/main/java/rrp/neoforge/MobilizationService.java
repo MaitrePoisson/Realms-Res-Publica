@@ -134,7 +134,7 @@ public final class MobilizationService {
                 guards.add(v);
             }
         }
-        int n = Regiment.size(guards.size(), present.size(), cfg.get(SimConfig.Key.MOBILIZATION_SHARE));
+        int n = Regiment.size(guards.size(), present.size(), LawService.conscription(site.id(), cfg));
         if (n <= 0) {
             return null;
         }

@@ -146,6 +146,12 @@ public final class SimConfig {
         FOUND_COST(5, 0, 100000),
         FOUND_MIN_DISTANCE(96, 0, 100000),
         FOUND_MAX_PER_PLAYER(1, 0, 100),
+        LAW_CONSCRIPTION_MAX(0.6, 0, 1),
+        TAX_MAX_RATE(0.5, 0, 1),
+        TAX_PERIOD_S(1200, 0, 1000000),
+        TAX_PER_VILLAGER(2, 0, 100),
+        TAX_FREE_BURDEN(0.5, 0, 10),
+        TAX_UNREST_PER_POINT(20, 0, 1000),
         SHOW_ROLE_NAMES(1, 0, 1),
         SHOW_ACTION_BAR(1, 0, 1);
 

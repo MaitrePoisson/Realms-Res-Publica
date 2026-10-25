@@ -265,6 +265,18 @@ found_cost: 5
 found_min_distance: 96
 # Nombre maximal de villages diriges par un meme Souverain. [0 ; 100]
 found_max_per_player: 1
+# Part maximale de la population qu'un Souverain peut mobiliser par decret. [0 ; 1]
+law_conscription_max: 0.6
+# Taux d'impot maximal par ressource fixe par un Souverain. [0 ; 1]
+tax_max_rate: 0.5
+# Periode (s) de la collecte des impots (1200 = un jour Minecraft). [0 ; 1000000]
+tax_period_s: 1200
+# Production par villageois et par periode sur laquelle porte l'impot. [0 ; 100]
+tax_per_villager: 2
+# Somme des taux sans mecontentement ; au-dela, chaque villageois perd de la loyaute. [0 ; 10]
+tax_free_burden: 0.5
+# Loyaute perdue par villageois et par periode pour chaque point de taux au-dessus du seuil. [0 ; 1000]
+tax_unrest_per_point: 20
 # Affiche le rôle au-dessus des villageois (1 = oui, 0 = non). [0 ; 1]
 show_role_names: 1
 # Affiche à chaque joueur, dans un village, une barre d'action (population, nourriture, crise). [0 ; 1]

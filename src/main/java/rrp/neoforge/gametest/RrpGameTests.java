@@ -1069,6 +1069,72 @@ public final class RrpGameTests {
         h.assertTrue(rrp.neoforge.SovereignService.found(player, level, far) == rrp.core.player.Founding.Verdict.TOO_CLOSE,
                 "min distance enforced");
         rrp.neoforge.PlayerService.ledger().clear();
+        reset();
+        wipeTown(h);
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA)
+    public static void lawsandtaxes(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        rrp.neoforge.PlayerService.ledger().clear();
+        rrp.neoforge.PlayerService.laws().clear();
+        try {
+            RrpMod.setSimConfig(saved.with(rrp.core.SimConfig.Key.CARAVAN_AMBUSH_CHANCE, 0));
+            var cfg = RrpMod.simConfig();
+            var player = h.makeMockServerPlayerInLevel();
+            a.setOwner(java.util.UUID.randomUUID().toString());
+            var laws = rrp.neoforge.PlayerService.laws().of(a.id());
+            // taxes: a levy reaches the warehouse, a heavy burden costs loyalty
+            laws.setTax("FOOD", 0.4);
+            int before = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            int paid = rrp.neoforge.LawService.collect(cfg, RrpMod.registry());
+            int after = RrpMod.warehouse().read(a, level).getOrDefault(Resource.FOOD, 0);
+            h.assertTrue(paid > 0 && after - before == paid, "tax paid into the warehouse: " + paid);
+            double loyal = a.state().villagers().get(0).loyalty();
+            laws.setTax("ORE", 0.5);
+            rrp.neoforge.LawService.collect(cfg, RrpMod.registry());
+            h.assertTrue(a.state().villagers().get(0).loyalty() < loyal, "a heavy burden lowers loyalty");
+            // conscription share is capped by config
+            laws.setConscription(0.9);
+            h.assertTrue(rrp.neoforge.LawService.conscription(a.id(), cfg) == cfg.get(rrp.core.SimConfig.Key.LAW_CONSCRIPTION_MAX),
+                    "conscription capped");
+            // embargo stops the caravans
+            Container ba = (Container) h.getBlockEntity(new BlockPos(14, 1, 14));
+            ba.setItem(1, new ItemStack(Items.IRON_INGOT, 64));
+            ba.setItem(2, new ItemStack(Items.IRON_INGOT, 56));
+            BlockPos bp = barrel(h, 18, 18, 0);
+            VillageSite b = RrpMod.registry().create(a.worldName(), bp.getX(), bp.getY(), bp.getZ(), 5);
+            h.assertTrue(RrpMod.warehouse().set(b, level, bp), "second warehouse");
+            Container bb = (Container) level.getBlockEntity(bp);
+            for (int i = 0; i < 4; i++) {
+                bb.setItem(i, new ItemStack(Items.BREAD, 50));
+            }
+            bb.setItem(5, new ItemStack(Items.IRON_INGOT, 5));
+            RrpMod.warehouse().refresh(a, level);
+            RrpMod.warehouse().refresh(b, level);
+            rrp.neoforge.CaravanService.reset();
+            laws.toggleEmbargo(b.id());
+            h.assertTrue(rrp.neoforge.CaravanService.dispatch(a, b, cfg).isEmpty(), "embargo stops the caravan");
+            laws.toggleEmbargo(b.id());
+            h.assertTrue(rrp.neoforge.CaravanService.dispatch(a, b, cfg).isPresent(), "caravan leaves once lifted");
+            // foreigners' building ban
+            BlockPos inside = h.absolutePos(new BlockPos(12, 2, 12));
+            rrp.neoforge.PlayerService.ledger().switchRole(player.getUUID(), rrp.core.player.PlayerRole.MERCHANT, 0, 0);
+            h.assertTrue(!rrp.neoforge.LawService.bans(player, level, inside), "no ban by default");
+            laws.setForeignersBuildBan(true);
+            h.assertTrue(rrp.neoforge.LawService.bans(player, level, inside), "foreign builder refused");
+            rrp.neoforge.PlayerService.ledger().switchRole(player.getUUID(), rrp.core.player.PlayerRole.OBSERVER, 0, 0);
+            h.assertTrue(!rrp.neoforge.LawService.bans(player, level, inside), "observers are never targeted");
+        } finally {
+            rrp.neoforge.CaravanService.reset();
+            rrp.neoforge.PlayerService.ledger().clear();
+            rrp.neoforge.PlayerService.laws().clear();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
         h.succeed();
     }
 }

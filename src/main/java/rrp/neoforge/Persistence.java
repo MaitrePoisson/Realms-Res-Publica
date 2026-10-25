@@ -108,6 +108,22 @@ public final class Persistence {
             pl.add(r);
         });
         root.add("players", pl);
+        JsonArray lw = new JsonArray();
+        PlayerService.laws().all().forEach((k, l) -> {
+            JsonObject r = new JsonObject();
+            r.addProperty("village", k);
+            r.addProperty("openBorders", l.openBorders());
+            r.addProperty("buildBan", l.foreignersBuildBan());
+            r.addProperty("conscription", l.conscription());
+            JsonArray em = new JsonArray();
+            l.embargo().forEach(em::add);
+            r.add("embargo", em);
+            JsonObject tx = new JsonObject();
+            l.taxes().forEach(tx::addProperty);
+            r.add("taxes", tx);
+            lw.add(r);
+        });
+        root.add("laws", lw);
         try {
             Files.createDirectories(file.getParent());
             Path tmp = file.resolveSibling(FILE + ".tmp");
@@ -155,6 +171,22 @@ public final class Persistence {
                 for (JsonElement e : root.getAsJsonArray("tributaries")) {
                     JsonObject r = e.getAsJsonObject();
                     WarResolution.restore(r.get("loser").getAsString(), r.get("winner").getAsString());
+                }
+            }
+            if (root.has("laws")) {
+                for (JsonElement e : root.getAsJsonArray("laws")) {
+                    try {
+                        JsonObject r = e.getAsJsonObject();
+                        var l = PlayerService.laws().of(r.get("village").getAsString());
+                        l.setOpenBorders(r.get("openBorders").getAsBoolean());
+                        l.setForeignersBuildBan(r.get("buildBan").getAsBoolean());
+                        l.setConscription(r.get("conscription").getAsDouble());
+                        r.getAsJsonArray("embargo").forEach(x -> l.embargo().add(x.getAsString()));
+                        r.getAsJsonObject("taxes").entrySet().forEach(x -> l.setTax(x.getKey(), x.getValue().getAsDouble()));
+                    } catch (RuntimeException ex) {
+                        problem = true;
+                        log.error("loi illisible ignoree dans {} : {}", file, ex.toString());
+                    }
                 }
             }
             if (root.has("players")) {

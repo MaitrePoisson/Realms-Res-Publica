@@ -120,4 +120,22 @@ class PersistenceTest {
         assertEquals(12, PlayerService.ledger().purse(id));
         PlayerService.ledger().clear();
     }
+
+    @Test
+    void lawsAndTaxesSurviveReload() {
+        PlayerService.laws().clear();
+        var l = PlayerService.laws().of("v1");
+        l.setOpenBorders(true);
+        l.setConscription(0.4);
+        l.toggleEmbargo("v2");
+        l.setTax("FOOD", 0.25);
+        assertTrue(persistence(new VillageRegistry()).flush());
+        PlayerService.laws().clear();
+        persistence(new VillageRegistry()).load();
+        var r = PlayerService.laws().peek("v1");
+        assertTrue(r != null && r.openBorders() && r.embargoes("v2"));
+        assertEquals(0.4, r.conscription(), 1e-9);
+        assertEquals(0.25, r.tax("FOOD"), 1e-9);
+        PlayerService.laws().clear();
+    }
 }

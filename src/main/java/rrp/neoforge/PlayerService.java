@@ -10,11 +10,17 @@ public final class PlayerService {
 
     private static final PlayerLedger LEDGER = new PlayerLedger();
 
+    private static final rrp.core.player.Laws LAWS = new rrp.core.player.Laws();
+
     private PlayerService() {
     }
 
     public static PlayerLedger ledger() {
         return LEDGER;
+    }
+
+    public static rrp.core.player.Laws laws() {
+        return LAWS;
     }
 
     public static PlayerRole roleOf(UUID id) {
