@@ -4,6 +4,7 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import rrp.core.Resource;
 import rrp.core.SimConfig;
 import rrp.core.player.PlayerRole;
@@ -114,6 +115,9 @@ public final class MarketService {
         }
         long cost = model.buyCost(stock, taken);
         PlayerService.ledger().withdraw(p.getUUID(), cost);
+        for (long due = cost; due > 0; due -= 64) { // the payment goes to the village treasury, not into thin air
+            RrpMod.warehouse().deposit(site, level, new ItemStack(Items.EMERALD, (int) Math.min(due, 64)));
+        }
         give(p, r, taken);
         done(p, site, r, taken, cfg);
         return new Receipt(Verdict.OK, taken, cost);
@@ -143,7 +147,7 @@ public final class MarketService {
         var inv = p.getInventory();
         for (int i = 0; i < inv.getContainerSize() && taken < max; i++) {
             ItemStack s = inv.getItem(i);
-            if (WarehouseService.classify(s) == r) {
+            if (s.is(CaravanService.stackOf(r, 1).getItem())) { // only the canonical item: no cheap-for-dear swaps
                 int t = Math.min(max - taken, s.getCount());
                 s.shrink(t);
                 taken += t;

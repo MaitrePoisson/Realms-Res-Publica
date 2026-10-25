@@ -260,7 +260,7 @@ talk_loyalty_bonus: 2
 # Delai (s) avant qu'un joueur puisse changer de role (revenir a Observateur est toujours libre). [0 ; 1000000]
 role_switch_cooldown_s: 300
 # Cout (emeraudes de la bourse) pour fonder un village en tant que Souverain. [0 ; 100000]
-found_cost: 5
+found_cost: 32
 # Distance minimale (blocs) entre un nouveau village de joueur et un village existant. [0 ; 100000]
 found_min_distance: 96
 # Nombre maximal de villages diriges par un meme Souverain. [0 ; 100]
@@ -278,11 +278,11 @@ tax_free_burden: 0.5
 # Loyaute perdue par villageois et par periode pour chaque point de taux au-dessus du seuil. [0 ; 1000]
 tax_unrest_per_point: 20
 # Paie de base (emeraudes) d'un contrat de nettoyage de campement. [0 ; 10000]
-contract_pay_base: 3
+contract_pay_base: 12
 # Supplement de paie par pillard du campement. [0 ; 1000]
-contract_pay_per_raider: 1
+contract_pay_per_raider: 3
 # Paie (emeraudes) d'un contrat de guerre affiche par un village. [0 ; 10000]
-contract_war_pay: 8
+contract_war_pay: 40
 # Periode (s) entre deux affichages automatiques de contrats par les villages. [0 ; 1000000]
 contract_post_period_s: 600
 # Duree (s) apres laquelle un contrat que personne n'accepte expire et rend la paie. [0 ; 1000000]

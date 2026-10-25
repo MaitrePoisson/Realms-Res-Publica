@@ -74,6 +74,7 @@ public final class PoliticalMap {
             }
         }
         ItemStack map = MapItem.create(level, p.getBlockX(), p.getBlockZ(), SCALE, false, true);
+        MapItem.lockMap(level, map); // locked: vanilla must not repaint the terrain over the faction colours
         map.set(DataComponents.CUSTOM_NAME, Component.literal(NAME));
         MapItemSavedData data = MapItem.getSavedData(map, level);
         if (data != null) {

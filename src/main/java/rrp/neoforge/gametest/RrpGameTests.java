@@ -1060,12 +1060,12 @@ public final class RrpGameTests {
         rrp.neoforge.PlayerService.ledger().switchRole(id, rrp.core.player.PlayerRole.SOVEREIGN, 0, 0);
         h.assertTrue(rrp.neoforge.SovereignService.found(player, level, base) == rrp.core.player.Founding.Verdict.TOO_POOR,
                 "founding costs emeralds");
-        rrp.neoforge.PlayerService.ledger().deposit(id, 20);
+        rrp.neoforge.PlayerService.ledger().deposit(id, 40);
         h.assertTrue(rrp.neoforge.SovereignService.found(player, level, base) == rrp.core.player.Founding.Verdict.OK, "founded");
         VillageSite v = rrp.neoforge.SovereignService.ownedBy(id).stream().findFirst().orElse(null);
         h.assertTrue(v != null && id.toString().equals(v.owner()), "the player owns the new village");
         h.assertTrue(v.hasHall(), "the Town Hall is registered");
-        h.assertTrue(rrp.neoforge.PlayerService.ledger().purse(id) == 15, "cost paid from the purse");
+        h.assertTrue(rrp.neoforge.PlayerService.ledger().purse(id) == 8, "cost paid from the purse");
         BlockPos far = base.offset(10, 0, 0);
         h.assertTrue(rrp.neoforge.SovereignService.found(player, level, far) == rrp.core.player.Founding.Verdict.TOO_CLOSE,
                 "min distance enforced");
@@ -1221,8 +1221,8 @@ public final class RrpGameTests {
             VillageSite camp = rawCamp(h, a, 26, 20, 2);
             h.assertTrue(rrp.neoforge.ContractService.autoPost(cfg, RrpMod.registry()) == 1, "one contract posted");
             var c = book.live(a.id(), rrp.core.player.Contract.Type.CLEAR_CAMP, camp.id());
-            h.assertTrue(c != null && c.pay() == 5, "pay = base + 2 raiders");
-            h.assertTrue(emeralds(a, h) == 35, "pay escrowed out of the warehouse: " + emeralds(a, h));
+            h.assertTrue(c != null && c.pay() == 18, "pay = base + 2 raiders");
+            h.assertTrue(emeralds(a, h) == 22, "pay escrowed out of the warehouse: " + emeralds(a, h));
             h.assertTrue(rrp.neoforge.ContractService.autoPost(cfg, RrpMod.registry()) == 0, "no duplicate");
             h.assertTrue(rrp.neoforge.ContractService.accept(merc, c.id(), cfg) == rrp.core.player.Contracts.Accept.OK, "accepted");
             rrp.neoforge.ContractService.update(1, cfg, RrpMod.registry());
@@ -1235,7 +1235,7 @@ public final class RrpGameTests {
             h.assertTrue(c.kills() == 2, "kills counted: " + c.kills());
             rrp.neoforge.ContractService.update(2, cfg, RrpMod.registry());
             h.assertTrue(c.state() == rrp.core.player.Contract.State.DONE && c.settled(), "contract done: " + c.state());
-            h.assertTrue(ledger.purse(merc.getUUID()) == 5, "mercenary paid: " + ledger.purse(merc.getUUID()));
+            h.assertTrue(ledger.purse(merc.getUUID()) == 18, "mercenary paid: " + ledger.purse(merc.getUUID()));
             h.assertTrue(book.reputation(merc.getUUID()) == 1, "reputation earned");
             RrpMod.registry().remove(camp.id()); // an emptied camp leaves the registry
             // a second camp, but the mercenary is too slow: the escrow goes back to the village
@@ -1247,7 +1247,7 @@ public final class RrpGameTests {
             rrp.neoforge.ContractService.update(1e9, cfg, RrpMod.registry());
             h.assertTrue(c2.state() == rrp.core.player.Contract.State.FAILED && c2.settled(), "late contract fails: " + c2.state());
             h.assertTrue(emeralds(a, h) == before + c2.pay(), "escrow returned");
-            h.assertTrue(ledger.purse(merc.getUUID()) == 5 && book.reputation(merc.getUUID()) == 0, "no pay, reputation lost");
+            h.assertTrue(ledger.purse(merc.getUUID()) == 18 && book.reputation(merc.getUUID()) == 0, "no pay, reputation lost");
             // war contracts: posting needs a war, victory plus a kill pays, a lost war refunds
             VillageSite b = RrpMod.registry().create(a.worldName(), a.x() + 60, a.y(), a.z(), 5);
             UUID foe = UUID.randomUUID();
@@ -1266,7 +1266,7 @@ public final class RrpGameTests {
             rrp.neoforge.WarResolution.record(new rrp.neoforge.WarResolution.Result(a.id(), b.id(), rrp.core.diplomacy.WarOutcome.Kind.PILLAGE, 0));
             rrp.neoforge.ContractService.update(3, cfg, RrpMod.registry());
             h.assertTrue(w.state() == rrp.core.player.Contract.State.DONE, "war won: " + w.state());
-            h.assertTrue(ledger.purse(merc.getUUID()) == 13, "war pay received: " + ledger.purse(merc.getUUID()));
+            h.assertTrue(ledger.purse(merc.getUUID()) == 26, "war pay received: " + ledger.purse(merc.getUUID()));
             // a ceasefire without a verdict cancels and refunds, without blame
             rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.WAR);
             before = emeralds(a, h);

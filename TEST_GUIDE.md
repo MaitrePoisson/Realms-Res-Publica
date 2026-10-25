@@ -49,3 +49,10 @@ NeoForge 21.1.x, Minecraft 1.21.1, Java 21. Copy `deliverable/RealmsResPublica.j
 - Outcome: the verdict (REPELLED / PILLAGE / ANNEXATION / DESTRUCTION) appears in chat and `/rrp war`; annexation transfers claims and starts tribute. Ceasefire restores peace and the relation.
 - Automated: `bash .athanor/check.sh quick war` replays a two-village war on a real dedicated server (log assertions + top-down export).
 - Keys: `relation_*`, `caravan_*`, `diplomacy_*`, `mobilization_*`, `siege_*`, `war_*` in `config.yml`.
+
+## Player roles (for testing; need a real player, so op in solo/LAN or on a server)
+- `/rrp role set sovereign`, build a lectern on a gold block: a village is founded (`found_*` limits). `/rrp tax set food 20`, `/rrp law ban on`, `/rrp law embargo <village>`, `/rrp plan zone market` (or two corners with a wooden shovel), `/rrp plan show`.
+- `/rrp role set mercenary`, `/rrp contract list` then `accept 1`; kill the raiders of the camp (or win the war) and the escrowed emeralds are paid to the purse (`/rrp role purse`).
+- `/rrp role set merchant`, `/rrp market prices`, buy where a resource is in surplus, sell in a village that lacks it; the daily cap (`market_daily_limit`) stops abuse. Relations between the villages improve.
+- Sovereign: right-click a cartography table for the political map; `/rrp register` lists relations with [Commerce] [Alliance] [Cessez-le-feu] [Ultimatum] buttons.
+- Automated: these flows run as GameTests with mock players (`sovereign*`, `mercenarycontracts`, `freemerchant`, `politicalmap`...) because a headless dedicated server has no client to log in; the console part (villages, wars, persistence) runs on a real server in `bash .athanor/check.sh`.
