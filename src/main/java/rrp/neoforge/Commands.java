@@ -26,7 +26,7 @@ public final class Commands {
     /** Niveau de permission vanilla requis (opérateur). */
     public static final int PERMISSION_LEVEL = 2;
 
-    static final List<String> SUBS = List.of("help", "tick", "village", "warehouse", "townhall", "status", "territory", "caravan", "diplomacy", "regiment", "siege", "war", "role", "law", "tax", "plan", "contract", "market", "inspect", "setrole",
+    static final List<String> SUBS = List.of("help", "tick", "village", "warehouse", "townhall", "status", "territory", "caravan", "diplomacy", "regiment", "siege", "war", "role", "law", "tax", "plan", "contract", "market", "register", "inspect", "setrole",
             "famine", "overpopulate", "insecurity", "reload");
 
     /** Corps d'une sous-commande : {@code args[0]} est le nom de la sous-commande. */
@@ -77,8 +77,8 @@ public final class Commands {
         String sub = args.length == 0 || args[0].isEmpty() ? "help" : args[0].toLowerCase(Locale.ROOT);
         switch (sub) {
             case "help" -> help(source);
-            case "tick", "village", "warehouse", "townhall", "status", "territory", "caravan", "diplomacy", "regiment", "siege", "war", "role", "law", "tax", "plan", "contract", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
-                if (!"role".equals(sub) && !"law".equals(sub) && !"tax".equals(sub) && !"plan".equals(sub) && !"contract".equals(sub) && !"market".equals(sub) && !source.hasPermission(PERMISSION_LEVEL)) {
+            case "tick", "village", "warehouse", "townhall", "status", "territory", "caravan", "diplomacy", "regiment", "siege", "war", "role", "law", "tax", "plan", "contract", "market", "register", "inspect", "setrole", "famine", "overpopulate", "insecurity" -> {
+                if (!"role".equals(sub) && !"law".equals(sub) && !"tax".equals(sub) && !"plan".equals(sub) && !"contract".equals(sub) && !"market".equals(sub) && !"register".equals(sub) && !source.hasPermission(PERMISSION_LEVEL)) {
                     reply(source, lang.msg("error.op_only"));
                     return;
                 }

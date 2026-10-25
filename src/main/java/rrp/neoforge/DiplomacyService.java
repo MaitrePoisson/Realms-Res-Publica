@@ -153,6 +153,28 @@ public final class DiplomacyService {
         registry.markDirty();
     }
 
+    /** Announces a war from {@code agg} to {@code def}; false when one is already pending or under way. */
+    public static synchronized boolean ultimatum(VillageSite agg, VillageSite def, SimConfig cfg) {
+        if (TREATIES.atWar(agg.id(), def.id()) || pendingFor(agg.id(), def.id())) {
+            return false;
+        }
+        double delay = cfg.get(SimConfig.Key.DIPLOMACY_WAR_DELAY_S);
+        PENDING.add(new Pending(agg.id(), def.id(), delay));
+        announce(agg, def, "diplomacy.ultimatum", agg.id(), def.id(), Math.round(delay), RrpMod.lang().get("diplomacy.reason.emissary"));
+        return true;
+    }
+
+    /** Sets a treaty between two villages and announces it. */
+    public static synchronized void conclude(VillageSite a, VillageSite b, State s) {
+        TREATIES.set(a.id(), b.id(), s);
+        String key = switch (s) {
+            case TRADE_TREATY -> "diplomacy.trade";
+            case DEFENSIVE_ALLIANCE -> "diplomacy.alliance";
+            default -> "diplomacy.ceasefire";
+        };
+        announce(a, b, key, a.id(), b.id());
+    }
+
     private static boolean pendingFor(String a, String b) {
         for (Pending p : PENDING) {
             if (p.aggressor.equals(a) && p.defender.equals(b) || p.aggressor.equals(b) && p.defender.equals(a)) {

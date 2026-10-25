@@ -52,6 +52,7 @@ public final class RrpMod {
         PlanService.install();
         ContractService.install();
         MarketService.install();
+        DiplomaticRegister.install();
         LOG.info("Realms & Res Publica chargé");
     }
 

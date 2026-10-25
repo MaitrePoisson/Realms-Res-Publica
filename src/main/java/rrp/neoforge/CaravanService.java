@@ -81,6 +81,19 @@ public final class CaravanService {
     public static synchronized long completed() { return completed; }
     public static synchronized long ambushed() { return ambushed; }
 
+    /** Routes {x1, z1, x2, z2} (blocks) of the caravans on the road in a world, for the political map. */
+    public static synchronized java.util.List<int[]> routes(String world) {
+        java.util.List<int[]> out = new ArrayList<>();
+        for (Caravan c : ACTIVE) {
+            VillageSite a = RrpMod.registry().get(c.from);
+            VillageSite b = RrpMod.registry().get(c.to);
+            if (a != null && b != null && a.worldName().equals(world) && b.worldName().equals(world)) {
+                out.add(new int[] {(int) a.x(), (int) a.z(), (int) b.x(), (int) b.z()});
+            }
+        }
+        return out;
+    }
+
     public static ItemStack stackOf(Resource r, int n) {
         return new ItemStack(switch (r) {
             case FOOD -> Items.BREAD;

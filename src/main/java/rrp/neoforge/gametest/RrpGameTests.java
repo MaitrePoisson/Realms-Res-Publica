@@ -1342,4 +1342,82 @@ public final class RrpGameTests {
         }
         h.succeed();
     }
+
+    @GameTest(template = ARENA)
+    public static void politicalmap(GameTestHelper h) {
+        VillageSite a = village(h, 4, 4, 10);
+        ServerLevel level = h.getLevel();
+        rrp.core.SimConfig saved = RrpMod.simConfig();
+        try {
+            var cfg = RrpMod.simConfig();
+            BlockPos bp = barrel(h, 30, 30, 0);
+            VillageSite b = RrpMod.registry().create(a.worldName(), bp.getX(), bp.getY(), bp.getZ(), 5);
+            var ruler = h.makeMockServerPlayerInLevel();
+            var other = h.makeMockServerPlayerInLevel();
+            a.setOwner(ruler.getUUID().toString());
+            ruler.moveTo(a.x(), a.y(), a.z());
+            rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.WAR);
+            // the map is a vanilla filled map painted with faction colours, war hatching and village markers
+            var stack = rrp.neoforge.PoliticalMap.use(ruler, level);
+            h.assertTrue(stack.is(Items.FILLED_MAP), "a filled map is given");
+            var data = net.minecraft.world.item.MapItem.getSavedData(stack, level);
+            h.assertTrue(data != null, "map data exists");
+            java.util.Set<Byte> seen = new java.util.HashSet<>();
+            for (byte c : data.colors) {
+                seen.add(c);
+            }
+            byte marker = net.minecraft.world.level.material.MapColor.SNOW.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.HIGH);
+            byte hatch = net.minecraft.world.level.material.MapColor.FIRE.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.NORMAL);
+            byte border = net.minecraft.world.level.material.MapColor.COLOR_BLACK.getPackedId(net.minecraft.world.level.material.MapColor.Brightness.LOWEST);
+            h.assertTrue(seen.contains(marker), "village markers painted");
+            h.assertTrue(seen.contains(hatch), "war zones hatched");
+            h.assertTrue(seen.contains(border), "borders painted");
+            h.assertTrue(seen.size() >= 5, "several colours: " + seen.size());
+            // refreshed on interaction: wipe it, hold it, use the table again
+            java.util.Arrays.fill(data.colors, (byte) 0);
+            ruler.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND, stack);
+            var again = rrp.neoforge.PoliticalMap.use(ruler, level);
+            h.assertTrue(again == stack && data.colors[64 * 128 + 64] != 0, "held political map repainted in place");
+            // diplomatic register: ruler gets clickable proposals, observer reads only
+            rrp.neoforge.DiplomacyService.treaties().set(a.id(), b.id(), rrp.core.diplomacy.Treaty.State.PEACE);
+            boolean clickable = false;
+            for (var line : rrp.neoforge.DiplomaticRegister.lines(ruler, cfg)) {
+                for (var part : line.toFlatList(line.getStyle())) {
+                    clickable |= part.getStyle().getClickEvent() != null;
+                }
+            }
+            h.assertTrue(clickable, "ruler sees clickable actions");
+            for (var line : rrp.neoforge.DiplomaticRegister.lines(other, cfg)) {
+                for (var part : line.toFlatList(line.getStyle())) {
+                    h.assertTrue(part.getStyle().getClickEvent() == null, "observer register is read-only");
+                }
+            }
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(other, a, b, rrp.core.player.Proposals.Kind.TRADE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.NOT_RULER, "only the ruler sends an emissary");
+            // trade proposal answered by the decider: refused when cold, accepted when warm
+            rrp.neoforge.RelationService.change(a, b, -100 - rrp.neoforge.RelationService.index(a, b, cfg), cfg);
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(ruler, a, b, rrp.core.player.Proposals.Kind.TRADE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.REFUSED, "hostile village refuses trade");
+            rrp.neoforge.RelationService.change(a, b, 60 - rrp.neoforge.RelationService.index(a, b, cfg), cfg);
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(ruler, a, b, rrp.core.player.Proposals.Kind.TRADE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.ACCEPTED, "friendly village accepts trade");
+            h.assertTrue(rrp.neoforge.DiplomacyService.state(a.id(), b.id()) == rrp.core.diplomacy.Treaty.State.TRADE_TREATY, "treaty signed");
+            // ultimatum then ceasefire
+            rrp.neoforge.RelationService.change(a, b, -20 - rrp.neoforge.RelationService.index(a, b, cfg), cfg);
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(ruler, a, b, rrp.core.player.Proposals.Kind.ULTIMATUM, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.ACCEPTED, "ultimatum delivered");
+            h.assertTrue(!rrp.neoforge.DiplomacyService.pending().isEmpty(), "countdown started");
+            rrp.neoforge.DiplomacyService.open(a.id(), b.id(), RrpMod.registry());
+            h.assertTrue(rrp.neoforge.DiplomacyService.atWar(a.id(), b.id()), "war opened");
+            rrp.neoforge.RelationService.change(a, b, -40 - rrp.neoforge.RelationService.index(a, b, cfg), cfg);
+            h.assertTrue(rrp.neoforge.DiplomaticRegister.propose(ruler, a, b, rrp.core.player.Proposals.Kind.CEASEFIRE, cfg)
+                    == rrp.neoforge.DiplomaticRegister.Result.ACCEPTED, "ceasefire accepted");
+            h.assertTrue(!rrp.neoforge.DiplomacyService.atWar(a.id(), b.id()), "war ended");
+        } finally {
+            rrp.neoforge.DiplomacyService.reset();
+            reset();
+            RrpMod.setSimConfig(saved);
+        }
+        h.succeed();
+    }
 }
