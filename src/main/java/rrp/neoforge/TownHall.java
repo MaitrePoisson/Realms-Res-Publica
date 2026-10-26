@@ -27,9 +27,17 @@ public final class TownHall {
 
     /** Pose l'Hôtel de Ville (socle d'or + lutrin) avec le socle en {@code base}. */
     public static void build(ServerLevel level, BlockPos base) {
-        level.setBlock(base, Blocks.GOLD_BLOCK.defaultBlockState(), Block.UPDATE_CLIENTS);
-        level.setBlock(base.above(), Blocks.LECTERN.defaultBlockState()
-                .setValue(net.minecraft.world.level.block.LecternBlock.FACING, Direction.SOUTH), Block.UPDATE_CLIENTS);
+        for (var p : blocks(base)) {
+            level.setBlock(p.pos(), p.state(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** Les deux blocs de l'Hôtel de Ville dans l'ordre de pose : le socle d'or, puis le lutrin (mode visible). */
+    public static java.util.List<rrp.neoforge.building.BuildJob.Placement> blocks(BlockPos base) {
+        return java.util.List.of(
+                new rrp.neoforge.building.BuildJob.Placement(base, Blocks.GOLD_BLOCK.defaultBlockState()),
+                new rrp.neoforge.building.BuildJob.Placement(base.above(), Blocks.LECTERN.defaultBlockState()
+                        .setValue(net.minecraft.world.level.block.LecternBlock.FACING, Direction.SOUTH)));
     }
 
     /** Premier emplacement libre (sol plein, deux blocs d'air) autour du centre du village, ou {@code null}. */

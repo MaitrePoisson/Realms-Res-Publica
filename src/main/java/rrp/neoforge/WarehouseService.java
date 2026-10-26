@@ -165,7 +165,11 @@ public final class WarehouseService {
 
     /** Emplacement libre (sol plein, air au-dessus, sans être vivant) à 2-5 blocs de l'Hôtel de Ville. */
     public BlockPos freeSpotNearHall(VillageSite site, ServerLevel level) {
-        int[] h = site.hall();
+        return freeSpotAround(site.hall(), level, java.util.Set.of());
+    }
+
+    /** Like {@link #freeSpotNearHall} around the hall position {@code h} (x, y, z), skipping the {@code excluded} spots. */
+    public BlockPos freeSpotAround(int[] h, ServerLevel level, java.util.Collection<BlockPos> excluded) {
         int r = Math.max(2, storeRadius());
         for (int d = 2; d <= r; d++) {
             for (int dx = -d; dx <= d; dx++) {
@@ -174,7 +178,7 @@ public final class WarehouseService {
                         continue;
                     }
                     BlockPos p = new BlockPos(h[0] + dx, h[1], h[2] + dz);
-                    if (level.hasChunk(p.getX() >> 4, p.getZ() >> 4) && level.getBlockState(p).isAir()
+                    if (!excluded.contains(p) && level.hasChunk(p.getX() >> 4, p.getZ() >> 4) && level.getBlockState(p).isAir()
                             && level.getBlockState(p.above()).isAir() && level.getBlockState(p.below()).blocksMotion()
                             && level.getEntitiesOfClass(LivingEntity.class, new AABB(p)).isEmpty()) {
                         return p;

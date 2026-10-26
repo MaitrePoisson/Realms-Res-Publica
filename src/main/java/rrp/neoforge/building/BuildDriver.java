@@ -5,13 +5,17 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import rrp.core.Resource;
 import rrp.core.SimConfig;
 import rrp.core.building.BuildPace;
 import rrp.neoforge.RrpMod;
@@ -72,6 +76,7 @@ public final class BuildDriver {
 
     private final Supplier<SimConfig> config;
     private final Map<UUID, Job> jobs = new HashMap<>();
+    private final Map<UUID, BuildJob> lists = new HashMap<>();
     private long placed;
     private long levelled;
     private long waits;
@@ -82,7 +87,12 @@ public final class BuildDriver {
 
     /** True while the villager has a job (the scheduler leaves it alone). */
     public boolean busy(Villager v) {
-        return jobs.containsKey(v.getUUID());
+        return jobs.containsKey(v.getUUID()) || lists.containsKey(v.getUUID());
+    }
+
+    /** The generic block-list job of the builder (hut, Town Hall, border post...), or {@code null}. */
+    public BuildJob listJob(Villager v) {
+        return lists.get(v.getUUID());
     }
 
     public Job job(Villager v) {
@@ -90,7 +100,7 @@ public final class BuildDriver {
     }
 
     public int activeJobs() {
-        return jobs.size();
+        return jobs.size() + lists.size();
     }
 
     /** Blocks laid, levelling rows done and ticks lost to an entity in the way since the start (tests, diagnostic). */
@@ -115,11 +125,27 @@ public final class BuildDriver {
         return job;
     }
 
+    /** Starts (or keeps) a block-list job for the builder: the blocks go down in the given order, at the visible pace. */
+    public BuildJob startList(Villager v, VillageSite site, ServerLevel level, java.util.List<BuildJob.Placement> blocks,
+                              int woodCost, Runnable onDone) {
+        BuildJob running = lists.get(v.getUUID());
+        if (running != null) {
+            return running;
+        }
+        BuildJob job = new BuildJob(v, site, level, blocks, woodCost, onDone);
+        lists.put(v.getUUID(), job);
+        return job;
+    }
+
     /** Stops a builder's job (hand cleared, builder released). */
     public void cancel(Villager v) {
         Job j = jobs.remove(v.getUUID());
         if (j != null) {
             release(j);
+        }
+        BuildJob l = lists.remove(v.getUUID());
+        if (l != null) {
+            releaseHand(l.villager);
         }
     }
 
@@ -129,17 +155,103 @@ public final class BuildDriver {
             jobs.remove(j.villager.getUUID());
             release(j);
         }
+        for (BuildJob l : new ArrayList<>(lists.values())) {
+            lists.remove(l.villager.getUUID());
+            releaseHand(l.villager);
+        }
     }
 
     /** Advances every job by one tick (called with the mod clock; one step whatever the acceleration). */
     public void onTicks(long ticks) {
-        if (jobs.isEmpty() || ticks <= 0) {
+        if ((jobs.isEmpty() && lists.isEmpty()) || ticks <= 0) {
             return;
         }
         for (Job j : new ArrayList<>(jobs.values())) {
             if (jobs.get(j.villager.getUUID()) == j) {
                 tick(j);
             }
+        }
+        for (BuildJob l : new ArrayList<>(lists.values())) {
+            if (lists.get(l.villager.getUUID()) == l) {
+                tickList(l);
+            }
+        }
+    }
+
+    /** Ticks a builder may spend walking to a block-list job (a border post can be far); then it lays from where it stands. */
+    static final int MAX_LIST_WALK_TICKS = 1200;
+
+    private void tickList(BuildJob j) {
+        Villager v = j.villager;
+        if (!v.isAlive() || v.isRemoved() || v.level() != j.level || CivilianMachine.sheltered(v)
+                || !RrpMod.registry().all().contains(j.site)) {
+            endList(j, false);
+            return;
+        }
+        if (j.complete()) {
+            endList(j, true);
+            return;
+        }
+        SimConfig c = config.get();
+        BuildPace pace = new BuildPace(Math.max(1, (int) c.get(SimConfig.Key.BUILD_BLOCK_TICKS)));
+        j.since++;
+        BuildJob.Placement next = j.blocks.get(j.index);
+        BlockPos target = next.pos();
+        Gesture.hold(v, next.state());
+        Gesture.look(v, target);
+        double reach = c.get(SimConfig.Key.BUILD_REACH);
+        if (v.isNoAi() || v.getEyePosition().distanceTo(Vec3.atCenterOf(target)) <= reach) {
+            j.walking = 0;
+        } else if (j.walking < MAX_LIST_WALK_TICKS) {
+            if (j.walking++ % REORDER_TICKS == 0) {
+                walkTo(v, target);
+            }
+            return;
+        }
+        if (!pace.ready(j.since)) {
+            return;
+        }
+        for (LivingEntity l : j.level.getEntitiesOfClass(LivingEntity.class, new AABB(target))) {
+            waits++;
+            if (l != v) {
+                j.since = 0; // someone stands in the way: look again after another pace
+                return;
+            }
+            if (v.isNoAi() || ++j.aside > ASIDE_TICKS) {
+                BlockPos away = awayFrom(v, target);
+                v.teleportTo(away.getX() + 0.5, away.getY(), away.getZ() + 0.5);
+                j.aside = 0;
+            } else if (j.aside % REORDER_TICKS == 1) {
+                stepAside(v, target);
+            }
+            return;
+        }
+        j.level.setBlock(target, next.state(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        j.index++;
+        j.since = 0;
+        j.aside = 0;
+        placed++;
+        int due = BuildJob.woodDue(j.woodCost, j.index, j.blocks.size());
+        if (due > j.paid) {
+            CarriedItems.take(v, Resource.WOOD, due - j.paid);
+            j.paid = due;
+        }
+        RrpMod.registry().markDirty();
+        Gesture.placed(j.level, v, target, next.state(), (int) c.get(SimConfig.Key.BUILD_PARTICLES));
+        if (j.complete()) {
+            endList(j, true);
+        }
+    }
+
+    private void endList(BuildJob j, boolean done) {
+        lists.remove(j.villager.getUUID());
+        releaseHand(j.villager);
+        if (done) {
+            j.onDone.run();
+            RrpMod.registry().markDirty();
+        }
+        if (done && j.villager.isAlive() && !j.villager.isRemoved() && RrpMod.behaviors() != null) {
+            RrpMod.behaviors().runOnce(j.site, j.level, j.villager);
         }
     }
 
@@ -240,6 +352,11 @@ public final class BuildDriver {
 
     /** The builder stands in the block to lay: walks three blocks away from it. */
     private static void stepAside(Villager v, BlockPos block) {
+        walkTo(v, awayFrom(v, block));
+    }
+
+    /** The ground three blocks from {@code block}, on the side the builder stands. */
+    private static BlockPos awayFrom(Villager v, BlockPos block) {
         double dx = v.getX() - (block.getX() + 0.5);
         double dz = v.getZ() - (block.getZ() + 0.5);
         double len = Math.max(0.01, Math.sqrt(dx * dx + dz * dz));
@@ -248,8 +365,7 @@ public final class BuildDriver {
             dz = 0;
             len = 1;
         }
-        BlockPos away = BlockPos.containing(block.getX() + 0.5 + 3 * dx / len, v.getY(), block.getZ() + 0.5 + 3 * dz / len);
-        walkTo(v, away);
+        return BlockPos.containing(block.getX() + 0.5 + 3 * dx / len, v.getY(), block.getZ() + 0.5 + 3 * dz / len);
     }
 
     private void end(Job j, boolean chain) {
@@ -262,7 +378,10 @@ public final class BuildDriver {
     }
 
     private static void release(Job j) {
-        Villager v = j.villager;
+        releaseHand(j.villager);
+    }
+
+    private static void releaseHand(Villager v) {
         if (v.isAlive() && !v.isRemoved()) {
             v.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY);
             CarriedItems.showInHand(v);

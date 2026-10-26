@@ -214,7 +214,19 @@ public final class RrpGameTests {
         h.assertTrue(!site.hasHall(), "destroyed hall forgotten");
         setAll(h, Role.BUILDER);
         h.assertTrue(act(h, site), "builder did nothing");
+        var builder = mine(h);
+        var driver = RrpMod.build();
+        h.assertTrue(driver.listJob(builder) != null && !site.hasHall(), "the hall goes up block by block, nothing at once");
+        int pace = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS);
+        var jobBlocks = driver.listJob(builder).blocks();
+        drive(pace);
+        h.assertTrue(driver.listJob(builder).laid() == 1 && level0(h, jobBlocks.get(0).pos()).is(Blocks.GOLD_BLOCK)
+                && !level0(h, jobBlocks.get(1).pos()).is(Blocks.LECTERN), "first the gold block, the lectern not yet");
+        h.assertTrue(builder.getMainHandItem().is(Items.GOLD_BLOCK), "the builder holds the block it lays");
+        settleBuild(builder);
         h.assertTrue(site.hasHall(), "builder rebuilt the hall");
+        h.assertTrue(site.hasWarehouse() && WarehouseService.barrel(site, h.getLevel()) != null
+                && rrp.neoforge.logistics.Armoury.barrel(site, h.getLevel()) != null, "the hall barrels were laid and registered");
         h.assertTrue(site.inCore(Worlds.name(h.getLevel()), site.hall()[0], site.hall()[2], 12), "core contains hall");
         h.succeed();
     }
@@ -529,7 +541,16 @@ public final class RrpGameTests {
         var builder = mine(h);
         int[] first = rrp.neoforge.TerritoryService.nextMissing(level, map, site.id());
         h.assertTrue(first != null, "posts missing at start");
+        int y0 = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, first[0], first[1]);
         RrpMod.behaviors().runOnce(site, level, builder);
+        var driver = RrpMod.build();
+        h.assertTrue(driver.listJob(builder) != null, "the builder lays the post block by block");
+        h.assertTrue(!rrp.neoforge.TerritoryService.isMarked(level, first[0], first[1]), "nothing stands at once");
+        int pace = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS);
+        drive(pace);
+        h.assertTrue(level.getBlockState(new BlockPos(first[0], y0, first[1])).is(Blocks.STONE_BRICKS)
+                && !level.getBlockState(new BlockPos(first[0], y0 + 1, first[1])).is(Blocks.CHISELED_STONE_BRICKS), "partial post: stone bricks only");
+        settleBuild(builder);
         h.assertTrue(rrp.neoforge.TerritoryService.isMarked(level, first[0], first[1]), "first post placed");
         int y = level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES, first[0], first[1]);
         h.assertTrue(level.getBlockState(new BlockPos(first[0], y - 1, first[1])).getBlock() instanceof net.minecraft.world.level.block.BannerBlock,
@@ -1938,6 +1959,85 @@ public final class RrpGameTests {
         h.assertTrue(again.state().beds() > beds, "beds counted");
         h.assertTrue(again.built().getOrDefault(rrp.neoforge.urban.BuildType.HOUSE, 0) == 1, "built counter");
         h.assertTrue(!build.busy(v), "released");
+        h.succeed();
+    }
+
+    /** Ticks the build driver {@code n} times. */
+    private static void drive(int n) {
+        for (int i = 0; i < n; i++) {
+            RrpMod.build().onTicks(1);
+        }
+    }
+
+    private static net.minecraft.world.level.block.state.BlockState level0(GameTestHelper h, BlockPos p) {
+        return h.getLevel().getBlockState(p);
+    }
+
+    // ---------- the hut goes up block by block, paid from the carried load (M79) ----------
+
+    @GameTest(template = ARENA, timeoutTicks = 600, batch = "buildhut")
+    public static void buildhut(GameTestHelper h) {
+        try {
+            buildhutBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void buildhutBody(GameTestHelper h) {
+        for (int x = 0; x <= 23; x++) {
+            for (int z = 0; z <= 23; z++) {
+                h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+                for (int y = 1; y <= 12; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        VillageSite site = village(h, 2, 0, 0);
+        ServerLevel level = h.getLevel();
+        level.getEntitiesOfClass(Villager.class, h.getBounds()).stream().skip(1).forEach(Villager::discard);
+        Villager v = mine(h);
+        BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        setAll(h, Role.BUILDER);
+        var barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        RrpMod.warehouse().refresh(site, level);
+        var build = RrpMod.build();
+        int pace = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS);
+        site.state().setBeds(0);
+        int beds = site.state().beds();
+        for (int i = 0; i < 20 && build.listJob(v) == null; i++) {
+            RrpMod.behaviors().runOnce(site, level, v);
+            settleTrip(v, barrel.getBlockPos());
+        }
+        var job = build.listJob(v);
+        h.assertTrue(job != null && build.busy(v), "the builder has a hut job");
+        var blocks = job.blocks();
+        h.assertTrue(blocks.size() == 32, "the hut has 32 blocks: " + blocks.size());
+        h.assertTrue(blocks.stream().noneMatch(p -> level.getBlockState(p.pos()).is(p.state().getBlock())), "nothing stands at once");
+        h.assertTrue(!RrpMod.behaviors().work(site, level, v), "a builder with a job is left alone by the scheduler");
+        int wood0 = carried(v, Resource.WOOD);
+        int cost = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.HUT_WOOD);
+        h.assertTrue(wood0 >= cost, "the whole hut is carried at the start: " + wood0);
+        drive(pace * 6);
+        long up = blocks.stream().filter(p -> level.getBlockState(p.pos()).is(p.state().getBlock())).count();
+        h.assertTrue(up == 6 && job.laid() == 6, "six blocks after six paces: " + up);
+        h.assertTrue(blocks.get(0).pos().getY() == blocks.get(5).pos().getY(), "the bottom layer first");
+        h.assertTrue(level.getBlockState(blocks.get(31).pos()).isAir(), "the last block (bed or roof) is not there yet");
+        int mid = carried(v, Resource.WOOD);
+        h.assertTrue(mid < wood0 && mid > wood0 - cost, "the wood leaves the arms with the blocks: " + wood0 + " -> " + mid);
+        h.assertTrue(site.state().beds() == beds, "no bed counted before the hut is finished");
+        h.assertTrue(v.getMainHandItem().is(blocks.get(5).state().getBlock().asItem()), "the hand holds the block it lays");
+        drive(pace * 25);
+        h.assertTrue(job.laid() == 31 && !job.complete(), "one block left");
+        h.assertTrue(wood0 - carried(v, Resource.WOOD) == cost * 31 / 32, "the wood is paid in proportion: " + carried(v, Resource.WOOD));
+        drive(pace);
+        h.assertTrue(job.complete() && !build.busy(v), "the hut job is over");
+        h.assertTrue(blocks.stream().allMatch(p -> level.getBlockState(p.pos()).is(p.state().getBlock())), "the full hut stands");
+        h.assertTrue(blocks.stream().anyMatch(p -> level.getBlockState(p.pos()).getBlock() instanceof BedBlock), "with its bed");
+        h.assertTrue(site.state().beds() == beds + 1, "the bed is counted at the end");
         h.succeed();
     }
 

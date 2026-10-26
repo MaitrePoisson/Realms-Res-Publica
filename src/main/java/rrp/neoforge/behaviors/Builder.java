@@ -87,6 +87,10 @@ public final class Builder extends RoleBehavior {
     }
 
     private boolean work(BehaviorContext ctx) {
+        var driver = rrp.neoforge.RrpMod.build();
+        if (driver != null && driver.listJob(ctx.villager()) != null) {
+            return true; // laying a hut, the Town Hall or a border post block by block
+        }
         if (!ctx.site().hasHall()) {
             return buildTownHall(ctx);
         }
@@ -124,6 +128,16 @@ public final class Builder extends RoleBehavior {
         BlockPos origin = findSpot(ctx);
         if (origin == null) {
             return false;
+        }
+        if (driver != null && driver.visible()) {
+            // visible mode: the hut goes up block by block and the wood leaves the arms with the blocks
+            var site = ctx.site();
+            driver.startList(ctx.villager(), site, ctx.level(), hutInOrder(origin), cost, () -> {
+                site.state().setBeds(site.state().beds() + 1);
+                ctx.registry().markDirty();
+            });
+            ctx.registry().markDirty();
+            return true;
         }
         CarriedItems.take(ctx.villager(), Resource.WOOD, cost);
         walkToward(ctx, origin);
@@ -488,6 +502,17 @@ public final class Builder extends RoleBehavior {
         if (p == null) {
             return false;
         }
+        var driver = rrp.neoforge.RrpMod.build();
+        if (driver != null && driver.visible()) {
+            // visible mode: the builder walks to the post and lays its three blocks one by one (no material cost)
+            var blocks = rrp.neoforge.TerritoryService.postBlocks(ctx.level(), p[0], p[1], site.id());
+            if (blocks.isEmpty()) {
+                return false;
+            }
+            driver.startList(ctx.villager(), site, ctx.level(), blocks, 0, () -> { });
+            ctx.registry().markDirty();
+            return true;
+        }
         walkToward(ctx, new BlockPos(p[0], site.hall()[1], p[1]));
         return rrp.neoforge.TerritoryService.placePost(ctx.level(), p[0], p[1], site.id());
     }
@@ -516,6 +541,11 @@ public final class Builder extends RoleBehavior {
         if (base == null) {
             return false;
         }
+        var driver = rrp.neoforge.RrpMod.build();
+        if (driver != null && driver.visible()) {
+            startTownHallJob(ctx, driver, base);
+            return true;
+        }
         walkToward(ctx, base);
         TownHall.build(ctx.level(), base);
         ctx.site().setHall(base.getX(), base.getY(), base.getZ());
@@ -524,24 +554,86 @@ public final class Builder extends RoleBehavior {
         return true;
     }
 
-    /** Pose la hutte dont l'angle ouest-nord est {@code origin} (premier bloc libre au-dessus du sol). */
-    static void build(ServerLevel level, BlockPos origin) {
+    /**
+     * Visible mode: the builder lays the Town Hall (gold block, lectern) and the warehouse and armoury barrels beside it,
+     * block by block; the hall, the warehouse and the armoury are registered when the last block is down.
+     */
+    private static void startTownHallJob(BehaviorContext ctx, rrp.neoforge.building.BuildDriver driver, BlockPos base) {
+        var site = ctx.site();
+        var level = ctx.level();
+        var blocks = new java.util.ArrayList<>(TownHall.blocks(base));
+        int[] at = {base.getX(), base.getY(), base.getZ()};
+        BlockPos store = null;
+        BlockPos armoury = null;
+        if (!site.hasWarehouse()) {
+            store = ctx.warehouse().freeSpotAround(at, level, java.util.List.of());
+        }
+        if (site.armoury() == null) {
+            armoury = ctx.warehouse().freeSpotAround(at, level, store == null ? java.util.List.of() : java.util.List.of(store));
+        }
+        for (BlockPos barrel : java.util.Arrays.asList(store, armoury)) {
+            if (barrel != null) {
+                blocks.add(new rrp.neoforge.building.BuildJob.Placement(barrel, Blocks.BARREL.defaultBlockState()));
+            }
+        }
+        final BlockPos storeAt = store;
+        final BlockPos armouryAt = armoury;
+        driver.startList(ctx.villager(), site, level, blocks, 0, () -> {
+            site.setHall(base.getX(), base.getY(), base.getZ());
+            if (storeAt != null) {
+                ctx.warehouse().set(site, level, storeAt);
+            }
+            if (armouryAt != null && level.getBlockState(armouryAt).is(Blocks.BARREL)) {
+                site.setArmoury(armouryAt.getX(), armouryAt.getY(), armouryAt.getZ());
+            }
+            ctx.warehouse().ensureForHall(site, level);
+            ctx.registry().markDirty();
+        });
+        ctx.registry().markDirty();
+    }
+
+    /** The blocks of the hut whose west-north corner is {@code origin}, in no particular order. */
+    public static java.util.List<rrp.neoforge.building.BuildJob.Placement> hutBlocks(BlockPos origin) {
+        var out = new java.util.ArrayList<rrp.neoforge.building.BuildJob.Placement>();
         BlockState planks = Blocks.OAK_PLANKS.defaultBlockState();
         for (int dx = 0; dx < WIDTH; dx++) {
             for (int dz = 0; dz < DEPTH; dz++) {
                 boolean perimeter = dx == 0 || dz == 0 || dx == WIDTH - 1 || dz == DEPTH - 1;
                 boolean door = dx == 0 && dz == DEPTH / 2;
                 if (perimeter && !door) {
-                    level.setBlock(origin.offset(dx, 0, dz), planks, Block.UPDATE_CLIENTS);
-                    level.setBlock(origin.offset(dx, 1, dz), planks, Block.UPDATE_CLIENTS);
+                    out.add(new rrp.neoforge.building.BuildJob.Placement(origin.offset(dx, 0, dz), planks));
+                    out.add(new rrp.neoforge.building.BuildJob.Placement(origin.offset(dx, 1, dz), planks));
                 }
-                level.setBlock(origin.offset(dx, 2, dz), planks, Block.UPDATE_CLIENTS);
+                out.add(new rrp.neoforge.building.BuildJob.Placement(origin.offset(dx, 2, dz), planks));
             }
         }
         BlockPos foot = origin.offset(1, 0, DEPTH / 2);
         BlockState bed = Blocks.RED_BED.defaultBlockState().setValue(BedBlock.FACING, Direction.EAST);
-        level.setBlock(foot, bed.setValue(BedBlock.PART, BedPart.FOOT), Block.UPDATE_CLIENTS);
-        level.setBlock(foot.east(), bed.setValue(BedBlock.PART, BedPart.HEAD), Block.UPDATE_CLIENTS);
+        out.add(new rrp.neoforge.building.BuildJob.Placement(foot, bed.setValue(BedBlock.PART, BedPart.FOOT)));
+        out.add(new rrp.neoforge.building.BuildJob.Placement(foot.east(), bed.setValue(BedBlock.PART, BedPart.HEAD)));
+        return out;
+    }
+
+    /** The hut blocks in building order: bottom layer first, a snake walk inside a layer ({@code BlockOrder}). */
+    static java.util.List<rrp.neoforge.building.BuildJob.Placement> hutInOrder(BlockPos origin) {
+        var blocks = hutBlocks(origin);
+        var positions = new java.util.ArrayList<int[]>();
+        for (int i = 0; i < blocks.size(); i++) {
+            BlockPos p = blocks.get(i).pos().subtract(origin);
+            positions.add(new int[] {p.getX(), p.getY(), p.getZ(), i});
+        }
+        var sorted = new java.util.ArrayList<rrp.neoforge.building.BuildJob.Placement>();
+        for (int[] p : rrp.core.building.BlockOrder.sort(positions)) {
+            sorted.add(blocks.get(p[3]));
+        }
+        return sorted;
+    }
+
+    /** Pose la hutte dont l'angle ouest-nord est {@code origin} (premier bloc libre au-dessus du sol), d'un coup (mode instantané). */
+    static void build(ServerLevel level, BlockPos origin) {
+        for (var p : hutBlocks(origin)) {
+            level.setBlock(p.pos(), p.state(), Block.UPDATE_CLIENTS);
+        }
     }
 
     /** Emplacement plat et libre le plus proche du bâtisseur, dans son rayon de travail et dans le village. */

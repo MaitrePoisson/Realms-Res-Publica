@@ -99,17 +99,26 @@ public final class TerritoryService {
 
     /** Pose une borne : 2 blocs de pierre taillée et une bannière. Faux si chunk non chargé ou sol liquide. */
     public static boolean placePost(ServerLevel level, int x, int z, String faction) {
+        var blocks = postBlocks(level, x, z, faction);
+        for (var p : blocks) {
+            level.setBlock(p.pos(), p.state(), 3);
+        }
+        return !blocks.isEmpty();
+    }
+
+    /** Les trois blocs d'une borne dans l'ordre de pose (pierre, pierre taillée, bannière) ; vide si chunk non chargé ou sol liquide. */
+    public static java.util.List<rrp.neoforge.building.BuildJob.Placement> postBlocks(ServerLevel level, int x, int z, String faction) {
         if (!level.hasChunkAt(new BlockPos(x, 0, z))) {
-            return false;
+            return java.util.List.of();
         }
         int y = surface(level, x, z);
         if (!level.getBlockState(new BlockPos(x, y - 1, z)).getFluidState().isEmpty()) {
-            return false;
+            return java.util.List.of();
         }
-        level.setBlock(new BlockPos(x, y, z), Blocks.STONE_BRICKS.defaultBlockState(), 3);
-        level.setBlock(new BlockPos(x, y + 1, z), Blocks.CHISELED_STONE_BRICKS.defaultBlockState(), 3);
-        level.setBlock(new BlockPos(x, y + 2, z), banner(faction).defaultBlockState(), 3);
-        return true;
+        return java.util.List.of(
+                new rrp.neoforge.building.BuildJob.Placement(new BlockPos(x, y, z), Blocks.STONE_BRICKS.defaultBlockState()),
+                new rrp.neoforge.building.BuildJob.Placement(new BlockPos(x, y + 1, z), Blocks.CHISELED_STONE_BRICKS.defaultBlockState()),
+                new rrp.neoforge.building.BuildJob.Placement(new BlockPos(x, y + 2, z), banner(faction).defaultBlockState()));
     }
 
     /** Prochaine borne manquante de la faction, ou {@code null} si toutes sont posées. */
