@@ -4,9 +4,11 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.level.block.state.BlockState;
+import rrp.core.Resource;
 import rrp.neoforge.VillageSite;
 
 import java.util.List;
+import java.util.function.IntConsumer;
 
 /**
  * A generic job for the {@link BuildDriver}: a builder laying an explicit list of (position, state) blocks in the given
@@ -27,6 +29,12 @@ public final class BuildJob {
     final List<Placement> blocks;
     final int woodCost;
     final Runnable onDone;
+    /** What the job's cost is paid in (wood for a palisade or a hut, stone for walls and paving). */
+    final Resource payWith;
+    /** What the job is for ("defense", "roads"...): one job of a kind per village at a time, so counters never run ahead. */
+    String kind;
+    /** Called with the number of blocks laid after each block (persisting the counters of a palisade, a road...), or {@code null}. */
+    final IntConsumer progress;
     int index;
     int paid;
     int since;
@@ -35,15 +43,29 @@ public final class BuildJob {
 
     public BuildJob(Villager villager, VillageSite site, ServerLevel level, List<Placement> blocks, int woodCost,
                     Runnable onDone) {
+        this(villager, site, level, blocks, woodCost, Resource.WOOD, null, onDone);
+    }
+
+    public BuildJob(Villager villager, VillageSite site, ServerLevel level, List<Placement> blocks, int cost,
+                    Resource payWith, IntConsumer progress, Runnable onDone) {
         this.villager = villager;
         this.site = site;
         this.level = level;
         this.blocks = List.copyOf(blocks);
-        this.woodCost = Math.max(0, woodCost);
+        this.woodCost = Math.max(0, cost);
+        this.payWith = payWith;
+        this.progress = progress;
         this.onDone = onDone;
     }
 
     public List<Placement> blocks() { return blocks; }
+
+    public BuildJob kind(String kind) {
+        this.kind = kind;
+        return this;
+    }
+
+    public String kind() { return kind; }
 
     public int laid() { return index; }
 

@@ -8,6 +8,9 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.Heightmap;
 
+import rrp.neoforge.building.BuildJob;
+import rrp.neoforge.building.UnitProgress;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -220,6 +223,63 @@ public final class RoadNetwork {
             out.add(nx != x ? new int[] {x, z + 1} : new int[] {x + 1, z});
         }
         return out;
+    }
+
+    /**
+     * Blocs des {@code count} prochaines positions à poser en sentier de terre (la végétation au-dessus d'une tuile est
+     * dégagée d'abord), position après position, les fins de position étant inscrites dans {@code units}. Les tuiles qui ne
+     * sont ni terre, ni sable, ni gravier sont omises.
+     */
+    public static List<BuildJob.Placement> layBlocks(ServerLevel level, Road road, int count, int refY, UnitProgress units) {
+        List<BuildJob.Placement> out = new ArrayList<>();
+        for (int i = road.laid; i < road.length() && i < road.laid + count; i++) {
+            for (int[] t : tiles(road, i)) {
+                int y = surfaceY(level, t[0], t[1], refY);
+                if (y == BLOCKED) {
+                    continue;
+                }
+                BlockPos p = new BlockPos(t[0], y, t[1]);
+                BlockState s = level.getBlockState(p);
+                if (isRoadBlock(s) || !(s.is(BlockTags.DIRT) || s.is(BlockTags.SAND) || s.is(Blocks.GRAVEL))) {
+                    continue;
+                }
+                for (int up = 1; up <= 2; up++) {
+                    BlockState a = level.getBlockState(p.above(up));
+                    if (!a.isAir() && TerrainLeveler.isRemovable(a)) {
+                        out.add(new BuildJob.Placement(p.above(up), Blocks.AIR.defaultBlockState()));
+                    }
+                }
+                out.add(new BuildJob.Placement(p, Blocks.DIRT_PATH.defaultBlockState()));
+            }
+            units.unitEnds(out.size());
+        }
+        return out;
+    }
+
+    /** Blocs des {@code count} prochaines positions posées à daller (pavé et pierre taillée en damier). */
+    public static List<BuildJob.Placement> paveBlocks(ServerLevel level, Road road, int count, int refY, UnitProgress units) {
+        List<BuildJob.Placement> out = new ArrayList<>();
+        for (int i = road.paved; i < road.laid && i < road.paved + count; i++) {
+            for (int[] t : tiles(road, i)) {
+                int y = surfaceY(level, t[0], t[1], refY);
+                if (y != BLOCKED && level.getBlockState(new BlockPos(t[0], y, t[1])).is(Blocks.DIRT_PATH)) {
+                    out.add(new BuildJob.Placement(new BlockPos(t[0], y, t[1]),
+                            ((t[0] + t[1]) & 1) == 0 ? Blocks.COBBLESTONE.defaultBlockState() : Blocks.STONE_BRICKS.defaultBlockState()));
+                }
+            }
+            units.unitEnds(out.size());
+        }
+        return out;
+    }
+
+    /** Compte {@code n} positions de plus posées (appelé quand le bâtisseur les termine). */
+    public static void advanceLaid(Road road, int n) {
+        road.laid = Math.min(road.length(), road.laid + n);
+    }
+
+    /** Compte {@code n} positions de plus pavées. */
+    public static void advancePaved(Road road, int n) {
+        road.paved = Math.min(road.laid, road.paved + n);
     }
 
     /** Pose jusqu'à {@code count} positions de terre. Renvoie le nombre de positions traitées. */

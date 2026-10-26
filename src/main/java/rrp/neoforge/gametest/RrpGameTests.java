@@ -473,9 +473,27 @@ public final class RrpGameTests {
         d.restore(rrp.neoforge.urban.Defense.PALISADE, 9, 0, 0, 99);
         int guard = 0;
         var builder = RrpMod.adapter().present(site, level).get(0);
+        // the palisade goes up block by block along the ring: a partial state first, never a batch of columns at once
+        var build = RrpMod.build();
+        int pace = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS);
+        for (int i = 0; i < 20 && build.listJob(builder) == null; i++) {
+            RrpMod.behaviors().runOnce(site, level, builder);
+            settleTrip(builder, WarehouseService.barrel(site, level).getBlockPos());
+        }
+        var ring = build.listJob(builder);
+        h.assertTrue(ring != null && ring.kind().equals("defense") && d.laid() == 0
+                && ring.blocks().stream().noneMatch(p -> level.getBlockState(p.pos()).is(p.state().getBlock())), "the ring job starts empty");
+        Villager other = level.getEntitiesOfClass(Villager.class, h.getBounds()).stream().filter(x -> x != builder).findFirst().orElseThrow();
+        RrpMod.behaviors().runOnce(site, level, other);
+        h.assertTrue(build.listJob(other) == null || !build.listJob(other).kind().equals("defense"), "one ring job at a time");
+        drive(pace * 4);
+        h.assertTrue(ring.laid() == 4 && ring.blocks().stream().filter(p -> level.getBlockState(p.pos()).is(p.state().getBlock())).count() == 4
+                && d.laid() >= 1 && d.laid() < rrp.neoforge.urban.DefensePlan.COLUMNS_PER_STEP, "four blocks after four paces: " + d.laid() + " columns");
+        h.assertTrue(ring.total() > 8 && ring.blocks().get(0).pos().getY() < ring.blocks().get(2).pos().getY(), "a column goes up from the ground");
         while (!d.palisadeDone() && guard++ < 60) {
             RrpMod.behaviors().runOnce(site, level, builder);
             settleTrip(builder, WarehouseService.barrel(site, level).getBlockPos());
+            settleBuild(builder);
         }
         h.assertTrue(d.palisadeDone(), "palisade not finished");
         int cx = hall.getX();
@@ -495,7 +513,7 @@ public final class RrpGameTests {
         // upgrade to stone once the stone stock and the population allow it
         guard = 0;
         while (!d.stoneDone() && guard++ < 80) {
-            actSettled(h, site);
+            actBuilt(h, site);
         }
         h.assertTrue(d.stage() == rrp.neoforge.urban.Defense.STONE && d.stoneDone(), "stone upgrade not finished");
         for (int i = 0; i < d.length(); i++) {
@@ -706,7 +724,10 @@ public final class RrpGameTests {
         RrpMod.warehouse().refresh(site, level);
         setAll(h, Role.BUILDER);
         h.assertTrue(act(h, site), "builder did not start the road");
-        h.assertTrue(road.hasPath() && road.laid() > 0, "path planned and tiles laid");
+        var roadJob = RrpMod.build().listJob(mine(h));
+        h.assertTrue(road.hasPath() && road.laid() == 0 && roadJob != null && roadJob.kind().equals("roads"), "path planned, nothing laid at once");
+        drive((int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS) * 4);
+        h.assertTrue(road.laid() >= 1 && road.laid() < road.length() && !road.laidDone(), "a partial path after four paces: " + road.laid());
         h.assertTrue(rrp.neoforge.RrpMod.persistence().flush(), "flush");
         RrpMod.persistence().load();
         VillageSite again = RrpMod.registry().all().stream().findFirst().orElseThrow();
@@ -716,7 +737,7 @@ public final class RrpGameTests {
         var r = again.roads().get(0);
         int guard = 0;
         while (!r.laidDone() && guard++ < 60) {
-            actSettled(h, again);
+            actBuilt(h, again);
         }
         h.assertTrue(r.laidDone(), "road laid");
         int[] p = r.path();
@@ -746,7 +767,7 @@ public final class RrpGameTests {
         // upgrade: enough stone and population -> paved
         guard = 0;
         while (!r.pavedDone() && guard++ < 60) {
-            actSettled(h, again);
+            actBuilt(h, again);
         }
         h.assertTrue(r.pavedDone(), "road paved");
         h.assertTrue(rrp.neoforge.urban.RoadNetwork.allPaved(level, r, hall.getY() - 1), "every tile is stone");
@@ -1853,6 +1874,15 @@ public final class RrpGameTests {
             }
             RrpMod.logistics().onTicks(1);
         }
+    }
+
+    /** Like {@link #actSettled}, then every builder lays what it has started (the sync tests drive the build driver by hand). */
+    private static boolean actBuilt(GameTestHelper h, VillageSite site) {
+        boolean did = actSettled(h, site);
+        for (Villager v : h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds())) {
+            settleBuild(v);
+        }
+        return did;
     }
 
     /** Lets a builder with a job lay its blocks, tick after tick (the sync tests drive the build driver by hand). */

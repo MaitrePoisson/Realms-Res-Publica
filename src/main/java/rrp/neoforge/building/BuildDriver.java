@@ -12,6 +12,9 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.CrossCollisionBlock;
+import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
@@ -95,6 +98,11 @@ public final class BuildDriver {
         return lists.get(v.getUUID());
     }
 
+    /** True while a builder of the village lays a block-list job of this kind (palisade and walls, roads). */
+    public boolean kindActive(VillageSite site, String kind) {
+        return lists.values().stream().anyMatch(l -> l.site == site && kind.equals(l.kind));
+    }
+
     public Job job(Villager v) {
         return jobs.get(v.getUUID());
     }
@@ -133,6 +141,18 @@ public final class BuildDriver {
             return running;
         }
         BuildJob job = new BuildJob(v, site, level, blocks, woodCost, onDone);
+        lists.put(v.getUUID(), job);
+        return job;
+    }
+
+    /** Starts (or keeps) a block-list job paid in {@code payWith}, reporting its progress block by block (palisade, walls, roads). */
+    public BuildJob startList(Villager v, VillageSite site, ServerLevel level, java.util.List<BuildJob.Placement> blocks,
+                              int cost, Resource payWith, java.util.function.IntConsumer progress, Runnable onDone) {
+        BuildJob running = lists.get(v.getUUID());
+        if (running != null) {
+            return running;
+        }
+        BuildJob job = new BuildJob(v, site, level, blocks, cost, payWith, progress, onDone);
         lists.put(v.getUUID(), job);
         return job;
     }
@@ -226,20 +246,35 @@ public final class BuildDriver {
             }
             return;
         }
-        j.level.setBlock(target, next.state(), Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        lay(j.level, target, next.state());
         j.index++;
         j.since = 0;
         j.aside = 0;
         placed++;
         int due = BuildJob.woodDue(j.woodCost, j.index, j.blocks.size());
         if (due > j.paid) {
-            CarriedItems.take(v, Resource.WOOD, due - j.paid);
+            CarriedItems.take(v, j.payWith, due - j.paid);
             j.paid = due;
+        }
+        if (j.progress != null) {
+            j.progress.accept(j.index);
         }
         RrpMod.registry().markDirty();
         Gesture.placed(j.level, v, target, next.state(), (int) c.get(SimConfig.Key.BUILD_PARTICLES));
         if (j.complete()) {
             endList(j, true);
+        }
+    }
+
+    /** Lays one block; fences, panes and walls take the shape their neighbours give them and the neighbours update in turn. */
+    private static void lay(ServerLevel level, BlockPos target, BlockState state) {
+        level.setBlock(target, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+        if (state.getBlock() instanceof CrossCollisionBlock || state.getBlock() instanceof WallBlock) {
+            BlockState shaped = Block.updateFromNeighbourShapes(state, level, target);
+            if (shaped != state) {
+                level.setBlock(target, shaped, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+            }
+            shaped.updateNeighbourShapes(level, target, Block.UPDATE_CLIENTS);
         }
     }
 

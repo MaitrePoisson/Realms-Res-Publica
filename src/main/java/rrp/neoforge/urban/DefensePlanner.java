@@ -10,7 +10,10 @@ import net.minecraft.world.level.block.FenceBlock;
 import net.minecraft.world.level.block.FenceGateBlock;
 import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import rrp.neoforge.building.BuildJob;
+import rrp.neoforge.building.UnitProgress;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -41,27 +44,45 @@ public final class DefensePlanner {
         return Integer.MIN_VALUE;
     }
 
-    /** Pose (ou remplace) la colonne : clôture/mur de {@link DefensePlan#HEIGHT} blocs, ou porte s'il s'agit d'un croisement de route. */
-    public static void placeColumn(ServerLevel level, int x, int z, int refY, boolean stone, boolean gate, Direction gateFacing) {
+    /**
+     * Blocs à poser dans la colonne, de bas en haut : clôture ou mur de {@link DefensePlan#HEIGHT} blocs, ou porte à un
+     * croisement de route (les blocs au-dessus de la porte sont dégagés). Ce qui est déjà en place (même bloc) est omis :
+     * une colonne qui n'a besoin de rien donne une liste vide. La colonne n'est pas touchée.
+     */
+    public static List<BuildJob.Placement> columnBlocks(ServerLevel level, int x, int z, int refY, boolean stone, boolean gate,
+                                                        Direction gateFacing) {
+        List<BuildJob.Placement> out = new ArrayList<>();
         int g = groundY(level, x, z, refY);
         if (g == Integer.MIN_VALUE) {
-            return;
+            return out;
         }
-        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
         BlockState body = stone ? Blocks.STONE_BRICK_WALL.defaultBlockState() : Blocks.OAK_FENCE.defaultBlockState();
+        BlockState gateState = Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING, gateFacing);
         for (int h = 1; h <= DefensePlan.HEIGHT; h++) {
-            p.set(x, g + h, z);
+            BlockPos p = new BlockPos(x, g + h, z);
             BlockState cur = level.getBlockState(p);
             if (!cur.isAir() && !isFortification(cur.getBlock()) && !cur.canBeReplaced() && !cur.is(BlockTags.LEAVES)) {
                 continue;
             }
-            if (gate) {
-                BlockState gateState = Blocks.OAK_FENCE_GATE.defaultBlockState().setValue(FenceGateBlock.FACING, gateFacing);
-                level.setBlock(p, h == 1 ? gateState : Blocks.AIR.defaultBlockState(), Block.UPDATE_ALL);
-            } else {
-                level.setBlock(p, body, Block.UPDATE_ALL);
+            BlockState want = gate ? (h == 1 ? gateState : Blocks.AIR.defaultBlockState()) : body;
+            if (cur.is(want.getBlock())) {
+                continue;
             }
+            out.add(new BuildJob.Placement(p, want));
         }
+        return out;
+    }
+
+    /** Pose (ou remplace) la colonne en une fois (mode instantané) : voir {@link #columnBlocks}. */
+    public static void placeColumn(ServerLevel level, int x, int z, int refY, boolean stone, boolean gate, Direction gateFacing) {
+        for (BuildJob.Placement pl : columnBlocks(level, x, z, refY, stone, gate, gateFacing)) {
+            level.setBlock(pl.pos(), pl.state(), Block.UPDATE_ALL);
+        }
+    }
+
+    /** Orientation de la porte dans la colonne {@code c} de l'enceinte (elle s'ouvre à travers le côté). */
+    public static Direction gateFacing(int cz, int[] c, int r) {
+        return Math.abs(c[1] - cz) == r ? Direction.NORTH : Direction.EAST;
     }
 
     /** Pose ou améliore {@code count} colonnes à partir de {@code from} ; renvoie le nombre de colonnes traitées. */
@@ -71,11 +92,27 @@ public final class DefensePlanner {
         while (done < count && from + done < d.length()) {
             int[] c = DefensePlan.ringAt(cx, cz, r, from + done);
             boolean gate = DefensePlan.isGate(roadPaths, cx, cz, r, c[0], c[1]);
-            Direction facing = Math.abs(c[1] - cz) == r ? Direction.NORTH : Direction.EAST;
-            placeColumn(level, c[0], c[1], refY, stone, gate, facing);
+            placeColumn(level, c[0], c[1], refY, stone, gate, gateFacing(cz, c, r));
             done++;
         }
         return done;
+    }
+
+    /**
+     * Blocs de {@code count} colonnes de l'enceinte à partir de {@code from}, colonne après colonne (de bas en haut dans
+     * chacune), les fins de colonne étant inscrites dans {@code units}. Clôture ou mur de pierre, porte à un croisement de route.
+     */
+    public static List<BuildJob.Placement> ringBlocks(ServerLevel level, Defense d, int cx, int cz, int refY, List<int[]> roadPaths,
+                                                      int from, int count, boolean stone, UnitProgress units) {
+        List<BuildJob.Placement> out = new ArrayList<>();
+        int r = d.radius();
+        for (int done = 0; done < count && from + done < d.length(); done++) {
+            int[] c = DefensePlan.ringAt(cx, cz, r, from + done);
+            boolean gate = DefensePlan.isGate(roadPaths, cx, cz, r, c[0], c[1]);
+            out.addAll(columnBlocks(level, c[0], c[1], refY, stone, gate, gateFacing(cz, c, r)));
+            units.unitEnds(out.size());
+        }
+        return out;
     }
 
     /** Vrai si la colonne porte une clôture, un mur ou une porte juste au-dessus du sol (test de fermeture). */

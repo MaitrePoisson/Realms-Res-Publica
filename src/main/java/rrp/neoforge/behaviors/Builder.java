@@ -390,11 +390,25 @@ public final class Builder extends RoleBehavior {
         var site = ctx.site();
         linkNeighbours(ctx);
         int ground = site.hall()[1] - 1;
+        var lay = rrp.neoforge.RrpMod.build();
+        if (lay != null && lay.visible() && lay.kindActive(site, "roads")) {
+            return false; // another builder is on the roads: the counters follow one job at a time
+        }
         for (var road : new java.util.ArrayList<>(site.roads())) {
             if (!road.hasPath() && !RoadNetwork.plan(ctx.level(), road, ground)) {
                 site.roads().remove(road);
                 ctx.registry().markDirty();
                 continue;
+            }
+            var driver = rrp.neoforge.RrpMod.build();
+            boolean visible = driver != null && driver.visible();
+            if (!road.laidDone() && visible) {
+                // visible mode: the builder walks along the path and lays the tiles one block at a time
+                var units = new rrp.neoforge.building.UnitProgress(n -> RoadNetwork.advanceLaid(road, n));
+                var blocks = RoadNetwork.layBlocks(ctx.level(), road, RoadNetwork.TILES_PER_STEP, ground, units);
+                driver.startList(ctx.villager(), site, ctx.level(), blocks, 0, Resource.STONE, units, units::finish).kind("roads");
+                ctx.registry().markDirty();
+                return true;
             }
             if (!road.laidDone()) {
                 int i = Math.min(road.laid(), road.length() - 1);
@@ -413,6 +427,14 @@ public final class Builder extends RoleBehavior {
                     continue;
                 }
                 if (supply == Supply.FETCHING) {
+                    return true;
+                }
+                if (visible) {
+                    // the stone leaves the arms with the tiles, one block at a time
+                    var units = new rrp.neoforge.building.UnitProgress(n -> RoadNetwork.advancePaved(road, n));
+                    var blocks = RoadNetwork.paveBlocks(ctx.level(), road, batch, ground, units);
+                    driver.startList(ctx.villager(), site, ctx.level(), blocks, cost, Resource.STONE, units, units::finish).kind("roads");
+                    ctx.registry().markDirty();
                     return true;
                 }
                 CarriedItems.take(ctx.villager(), Resource.STONE, cost);
@@ -457,12 +479,26 @@ public final class Builder extends RoleBehavior {
         }
         java.util.List<int[]> paths = new java.util.ArrayList<>();
         site.roads().stream().filter(RoadNetwork.Road::hasPath).forEach(r -> paths.add(r.path()));
+        var rings = rrp.neoforge.RrpMod.build();
+        boolean ringBusy = rings != null && rings.visible() && rings.kindActive(site, "defense");
         if (!d.palisadeDone()) {
+            if (ringBusy) {
+                return false; // another builder is on the ring: the counters follow one job at a time
+            }
             int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.laid());
             int cost = (n + 2) / 3;
             Supply supply = ensure(ctx, Resource.WOOD, cost, ctx.logistics().access().capacity());
             if (supply != Supply.READY) {
                 return supply == Supply.FETCHING;
+            }
+            var driver = rrp.neoforge.RrpMod.build();
+            if (driver != null && driver.visible()) {
+                // visible mode: the builder walks along the ring and sets the fence column after column
+                var units = new rrp.neoforge.building.UnitProgress(d::advanceLaid);
+                var blocks = DefensePlanner.ringBlocks(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.laid(), n, false, units);
+                driver.startList(ctx.villager(), site, ctx.level(), blocks, cost, Resource.WOOD, units, units::finish).kind("defense");
+                ctx.registry().markDirty();
+                return true;
             }
             CarriedItems.take(ctx.villager(), Resource.WOOD, cost);
             int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.laid());
@@ -478,11 +514,23 @@ public final class Builder extends RoleBehavior {
             ctx.registry().markDirty();
         }
         if (d.stage() == rrp.neoforge.urban.Defense.STONE && !d.stoneDone()) {
+            if (ringBusy) {
+                return false;
+            }
             int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.upgraded());
             int cost = (n + 1) / 2;
             Supply supply = ensure(ctx, Resource.STONE, cost, ctx.logistics().access().capacity());
             if (supply != Supply.READY) {
                 return supply == Supply.FETCHING;
+            }
+            var driver = rrp.neoforge.RrpMod.build();
+            if (driver != null && driver.visible()) {
+                // visible mode: the walls replace the fence column after column, the stone leaving the arms with the blocks
+                var units = new rrp.neoforge.building.UnitProgress(d::advanceUpgraded);
+                var blocks = DefensePlanner.ringBlocks(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.upgraded(), n, true, units);
+                driver.startList(ctx.villager(), site, ctx.level(), blocks, cost, Resource.STONE, units, units::finish).kind("defense");
+                ctx.registry().markDirty();
+                return true;
             }
             CarriedItems.take(ctx.villager(), Resource.STONE, cost);
             int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.upgraded());
