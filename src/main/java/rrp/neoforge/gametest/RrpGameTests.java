@@ -448,7 +448,7 @@ public final class RrpGameTests {
         var d = site.defense();
         h.assertTrue(site.state().population() >= 14 && !d.started(), "setup: population " + site.state().population());
         // trigger by population: the first guard tower is ordered on the borders
-        RrpMod.behaviors().runOnce(site, level, RrpMod.adapter().present(site, level).get(0));
+        RrpMod.behaviors().runOnce(site, level, level.getEntitiesOfClass(Villager.class, h.getBounds()).get(0));
         h.assertTrue(d.started() && d.towersIssued() == 1 && site.orders().size() == 1
                 && site.orders().get(0).type() == rrp.neoforge.urban.BuildType.TOWER, "first tower not ordered");
         site.orders().clear();
@@ -1996,6 +1996,172 @@ public final class RrpGameTests {
         h.assertTrue(act(h, site), "a full farmer heads for the warehouse");
         h.assertTrue(h.getBlockState(wheat).getValue(CropBlock.AGE) == 7, "a full farmer harvests nothing more");
         h.assertTrue(RrpMod.logistics().busy(v), "the full farmer is on a deposit trip");
+        h.succeed();
+    }
+
+    // ---------- armoury, local smith and guard kit (M72) ----------
+
+    private static BlockPos armouryPos(VillageSite site) {
+        int[] a = site.armoury();
+        return new BlockPos(a[0], a[1], a[2]);
+    }
+
+    /** Stands the villager at the container of its trip and lets the trip run to its end. */
+    private static void finishTrip(Villager v) {
+        var logi = RrpMod.logistics();
+        stand(v, logi.trip(v).chest(), true);
+        for (int i = 0; i < 800 && logi.busy(v); i++) {
+            logi.onTicks(1);
+        }
+    }
+
+    /** A village with a Town Hall (so an armoury barrel), a guard and a miner (the smith). */
+    private static VillageSite armouryVillage(GameTestHelper h, Villager[] who) {
+        // the arena ground is uneven from one test to the next: lay a stone floor with free air above for the hall
+        for (int x = 0; x <= 10; x++) {
+            for (int z = 6; z <= 18; z++) {
+                h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+                for (int y = 1; y <= 3; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(4, 1, 12)); // on the floor, as a real Town Hall stands on the ground
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        RrpMod.warehouse().ensureForHall(site, level);
+        var vs = level.getEntitiesOfClass(Villager.class, h.getBounds());
+        who[0] = vs.get(0);
+        who[1] = vs.get(1);
+        // the village also lists the neighbouring arenas' villagers: only this arena's guard may need a kit
+        for (Villager other : RrpMod.adapter().present(site, level)) {
+            if (other != who[0] && other != who[1]) {
+                RrpMod.adapter().setRole(other, Role.FARMER);
+            }
+        }
+        RrpMod.adapter().setRole(who[0], Role.GUARD);
+        RrpMod.adapter().setRole(who[1], Role.MINER);
+        return site;
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 200, batch = "armoury")
+    public static void armoury(GameTestHelper h) {
+        try {
+            armouryBody(h);
+        } finally {
+            wipeTown(h);
+            h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds()).forEach(Villager::discard);
+        }
+    }
+
+    private static void armouryBody(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        VillageSite site = armouryVillage(h, who);
+        Villager guard = who[0];
+        Villager smith = who[1];
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        h.assertTrue(site.hasArmoury(), "the Town Hall got an armoury barrel");
+        BlockPos arm = armouryPos(site);
+        BlockPos barrel = new BlockPos(site.warehouse()[0], site.warehouse()[1], site.warehouse()[2]);
+        h.assertTrue(level.getBlockState(arm).is(Blocks.BARREL) && !arm.equals(barrel), "a second barrel, not the warehouse");
+        h.assertTrue(arm.distSqr(new BlockPos(site.hall()[0], site.hall()[1], site.hall()[2])) <= 6 * 6, "next to the Town Hall");
+        Container armBe = barrelAt(h, arm);
+        h.assertTrue(RrpMod.warehouse().containers(site, level).stream().noneMatch(c -> c == armBe),
+                "the armoury is not part of the community stock");
+        // the warehouse holds raw material
+        Container wh = barrelAt(h, barrel);
+        wh.setItem(0, new ItemStack(Items.RAW_IRON, 20));
+        wh.setItem(1, new ItemStack(Items.OAK_LOG, 6));
+        wh.setItem(2, new ItemStack(Items.BREAD, 16));
+        RrpMod.warehouse().refresh(site, level);
+        var kit = rrp.neoforge.logistics.Armoury.lacking(guard);
+        int ore = 0;
+        int wood = 0;
+        for (var p : kit) {
+            var c = rrp.neoforge.logistics.Armoury.cost(p, RrpMod.simConfig());
+            ore += c.ore();
+            wood += c.wood();
+        }
+        h.assertTrue(ore > 0 && ore <= 20 && wood <= 6, "the kit is within the stock: " + ore + " ore, " + wood + " wood");
+        h.assertTrue(!rrp.neoforge.logistics.Armoury.needs(site, level).isEmpty(), "the guard lacks its kit");
+        // the smith fetches, forges (it takes time) and stocks
+        boolean checkedFirst = false;
+        for (int i = 0; i < 80 && !rrp.neoforge.logistics.Armoury.needs(site, level).isEmpty(); i++) {
+            stand(smith, barrel, true);
+            RrpMod.behaviors().runOnce(site, level, smith);
+            if (logi.busy(smith)) {
+                if (!checkedFirst && logi.trip(smith).kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.FORGE) {
+                    checkedFirst = true;
+                    h.assertTrue(rrp.neoforge.logistics.Armoury.stocked(armBe).isEmpty(), "nothing in the armoury before the forge is done");
+                    stand(smith, arm, true);
+                    for (int t = 0; t < 20; t++) {
+                        logi.onTicks(1);
+                    }
+                    h.assertTrue(rrp.neoforge.logistics.Armoury.stocked(armBe).isEmpty(), "forging takes more than a second");
+                }
+                finishTrip(smith);
+            }
+        }
+        h.assertTrue(checkedFirst, "the smith went to forge");
+        h.assertTrue(rrp.neoforge.logistics.Armoury.needs(site, level).isEmpty(), "every missing piece was forged: needs "
+                + rrp.neoforge.logistics.Armoury.needs(site, level) + " stocked " + rrp.neoforge.logistics.Armoury.stocked(armBe)
+                + " carried ore " + carried(smith, Resource.ORE) + " wood " + carried(smith, Resource.WOOD) + " stock ore "
+                + inStock(site, level, Resource.ORE) + " busy " + logi.busy(smith) + " kit " + kit);
+        var stocked = rrp.neoforge.logistics.Armoury.stocked(armBe);
+        for (var p : kit) {
+            h.assertTrue(stocked.getOrDefault(p, 0) >= 1, "the armoury holds " + p);
+        }
+        h.assertTrue(inStock(site, level, Resource.ORE) + carried(smith, Resource.ORE) == 20 - ore,
+                "iron paid exactly: " + inStock(site, level, Resource.ORE));
+        // the guard walks to the armoury and equips itself
+        stand(guard, barrel, false);
+        h.assertTrue(!guard.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.IRON_CHESTPLATE), "unarmoured at first");
+        h.assertTrue(RrpMod.behaviors().runOnce(site, level, guard), "the guard heads for the armoury");
+        h.assertTrue(logi.busy(guard) && logi.trip(guard).kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.EQUIP, "an equip trip");
+        finishTrip(guard);
+        h.assertTrue(guard.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.CHEST).is(Items.IRON_CHESTPLATE),
+                "iron chestplate from the armoury");
+        h.assertTrue(rrp.neoforge.logistics.Armoury.hasWeapon(guard) && rrp.neoforge.logistics.Armoury.complete(guard), "armed and complete");
+        h.assertTrue(rrp.neoforge.logistics.Armoury.stocked(armBe).isEmpty(), "the armoury gave everything it had");
+        // rations from the warehouse once equipped
+        stand(guard, barrel, true);
+        RrpMod.behaviors().runOnce(site, level, guard);
+        h.assertTrue(carried(guard, Resource.FOOD) == (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.GUARD_RATIONS), "rations taken");
+        h.succeed();
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 100, batch = "armoury")
+    public static void armouryEmpty(GameTestHelper h) {
+        try {
+            armouryEmptyBody(h);
+        } finally {
+            wipeTown(h);
+            h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds()).forEach(Villager::discard);
+        }
+    }
+
+    private static void armouryEmptyBody(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        VillageSite site = armouryVillage(h, who);
+        Villager guard = who[0];
+        ServerLevel level = h.getLevel();
+        rrp.neoforge.logistics.Armoury.resetNotices();
+        long before = rrp.neoforge.logistics.Armoury.notices();
+        h.assertTrue(!RrpMod.behaviors().runOnce(site, level, guard), "an unarmed guard does not patrol");
+        h.assertTrue(!RrpMod.logistics().busy(guard) && !rrp.neoforge.logistics.Armoury.hasWeapon(guard), "no trip, still unarmed");
+        h.assertTrue(rrp.neoforge.logistics.Armoury.notices() == before + 1, "the village was told the armoury is empty");
+        RrpMod.behaviors().runOnce(site, level, guard);
+        h.assertTrue(rrp.neoforge.logistics.Armoury.notices() == before + 1, "the notice is rate-limited");
+        // a hostile next to it is left alone while it has no weapon
+        Creeper creeper = h.spawn(EntityType.CREEPER, new BlockPos(13, 1, 8));
+        creeper.setNoAi(true);
+        guard.setPos(creeper.position().add(1, 0, 0));
+        RrpMod.behaviors().runOnce(site, level, guard);
+        h.assertTrue(creeper.isAlive(), "no strike without a weapon");
+        creeper.discard();
         h.succeed();
     }
 }

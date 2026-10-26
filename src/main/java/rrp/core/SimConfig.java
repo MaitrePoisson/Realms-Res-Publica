@@ -196,7 +196,9 @@ public final class SimConfig {
         GUARD_RANGED_RANGE(24, 8, 64),
         GUARD_CREEPER_ALERT(16, 4, 64),
         GUARD_FLANK_DISTANCE(4, 2, 16),
-        GUARD_ENCIRCLE_MIN(3, 2, 20);
+        GUARD_ENCIRCLE_MIN(3, 2, 20),
+        FORGE_TICKS(100, 10, 2400),
+        GUARD_RATIONS(4, 0, 32);
 
         private final double def;
         private final double min;

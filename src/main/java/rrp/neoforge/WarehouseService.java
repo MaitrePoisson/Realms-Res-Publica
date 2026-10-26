@@ -116,7 +116,8 @@ public final class WarehouseService {
             for (int dz = -r; dz <= r; dz++) {
                 for (int dy = -2; dy <= 2; dy++) {
                     BlockEntity be = level.getBlockEntity(new BlockPos(h[0] + dx, h[1] + dy, h[2] + dz));
-                    if ((be instanceof ChestBlockEntity || be instanceof BarrelBlockEntity) && be != primary) {
+                    if ((be instanceof ChestBlockEntity || be instanceof BarrelBlockEntity) && be != primary
+                            && !rrp.neoforge.logistics.Armoury.isArmoury(site, be.getBlockPos())) {
                         out.add((Container) be);
                     }
                 }
@@ -149,18 +150,21 @@ public final class WarehouseService {
     /** Si le village a un Hôtel de Ville mais pas d'entrepôt, pose un tonneau à côté et le désigne. */
     public void ensureForHall(VillageSite site, ServerLevel level) {
         TerritoryService.ensureDoctrine(level, site);
-        if (level == null || !site.hasHall() || site.hasWarehouse()) {
+        if (level == null || !site.hasHall()) {
             return;
         }
-        BlockPos spot = freeSpotNearHall(site, level);
-        if (spot != null) {
-            level.setBlock(spot, Blocks.BARREL.defaultBlockState(), Block.UPDATE_CLIENTS);
-            set(site, level, spot);
+        if (!site.hasWarehouse()) {
+            BlockPos spot = freeSpotNearHall(site, level);
+            if (spot != null) {
+                level.setBlock(spot, Blocks.BARREL.defaultBlockState(), Block.UPDATE_CLIENTS);
+                set(site, level, spot);
+            }
         }
+        rrp.neoforge.logistics.Armoury.ensure(site, level, this);
     }
 
     /** Emplacement libre (sol plein, air au-dessus, sans être vivant) à 2-5 blocs de l'Hôtel de Ville. */
-    private BlockPos freeSpotNearHall(VillageSite site, ServerLevel level) {
+    public BlockPos freeSpotNearHall(VillageSite site, ServerLevel level) {
         int[] h = site.hall();
         int r = Math.max(2, storeRadius());
         for (int d = 2; d <= r; d++) {

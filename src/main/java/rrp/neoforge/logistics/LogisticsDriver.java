@@ -41,7 +41,11 @@ public final class LogisticsDriver {
     /** Direction of a trip. */
     public enum Kind {
         WITHDRAW,
-        DEPOSIT
+        DEPOSIT,
+        /** A guard equips itself from the armoury. */
+        EQUIP,
+        /** The smith forges one piece of the kit and stocks it in the armoury. */
+        FORGE
     }
 
     /** Ticks after which a villager that still has not reached the chest gives up. */
@@ -153,6 +157,29 @@ public final class LogisticsDriver {
                 : start(new Trip(Kind.DEPOSIT, v, site, level, r, 0, chest, newCore(level)));
     }
 
+    /** Starts a trip to the armoury to equip a guard; {@code null} if there is no armoury or nothing it can take. */
+    public Trip requestEquip(Villager v, VillageSite site, ServerLevel level) {
+        Trip running = trips.get(v.getUUID());
+        if (running != null) {
+            return running;
+        }
+        var armoury = Armoury.barrel(site, level);
+        return armoury == null || !Armoury.canTake(v, armoury) ? null
+                : start(new Trip(Kind.EQUIP, v, site, level, null, 0, armoury.getBlockPos(), newCore(level)));
+    }
+
+    /** Starts a trip to the armoury where the smith forges for {@code forge_ticks}; {@code null} without armoury. */
+    public Trip requestForge(Villager v, VillageSite site, ServerLevel level) {
+        Trip running = trips.get(v.getUUID());
+        if (running != null) {
+            return running;
+        }
+        var armoury = Armoury.barrel(site, level);
+        int ticks = (int) config.get().get(SimConfig.Key.FORGE_TICKS);
+        return armoury == null ? null
+                : start(new Trip(Kind.FORGE, v, site, level, null, 0, armoury.getBlockPos(), new ChestTrip(access.reach(), ticks)));
+    }
+
     /** Stops a villager's trip (lid closed, villager released). */
     public void cancel(Villager v) {
         Trip t = trips.remove(v.getUUID());
@@ -203,7 +230,11 @@ public final class LogisticsDriver {
             finish(t, true);
             return;
         }
-        boolean stock = t.kind == Kind.DEPOSIT || ChestAccess.holds(target, t.resource);
+        boolean stock = switch (t.kind) {
+            case DEPOSIT, FORGE -> true;
+            case EQUIP -> Armoury.canTake(v, target);
+            case WITHDRAW -> ChestAccess.holds(target, t.resource);
+        };
         ChestTrip.Phase before = t.core.phase();
         ChestTrip.Phase now = t.core.tick(ChestAccess.distance(v, t.chest), stock, true);
         switch (now) {
@@ -231,9 +262,12 @@ public final class LogisticsDriver {
             }
             case CARRY, WORK -> {
                 if (t.core.takeNow()) {
-                    t.moved = t.kind == Kind.WITHDRAW
-                            ? access.withdraw(v, t.site, t.level, t.resource, t.amount, false).moved()
-                            : access.deposit(v, t.site, t.level, t.resource, false).moved();
+                    t.moved = switch (t.kind) {
+                        case WITHDRAW -> access.withdraw(v, t.site, t.level, t.resource, t.amount, false).moved();
+                        case DEPOSIT -> access.deposit(v, t.site, t.level, t.resource, false).moved();
+                        case EQUIP -> Armoury.equip(v, target);
+                        case FORGE -> Armoury.forge(v, t.site, t.level, config.get());
+                    };
                 }
                 finish(t, false);
             }

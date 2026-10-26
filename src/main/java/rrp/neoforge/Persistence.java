@@ -419,6 +419,14 @@ public final class Persistence {
             a.add(w[2]);
             o.add("warehouse", a);
         }
+        if (s.hasArmoury()) {
+            int[] w = s.armoury();
+            JsonArray a = new JsonArray();
+            a.add(w[0]);
+            a.add(w[1]);
+            a.add(w[2]);
+            o.add("armoury", a);
+        }
         o.addProperty("beds", st.beds());
         o.addProperty("level", st.level().name());
         o.addProperty("relations", st.relations());
@@ -526,6 +534,10 @@ public final class Persistence {
         if (o.has("warehouse")) {
             JsonArray a = o.getAsJsonArray("warehouse");
             s.setWarehouse(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
+        }
+        if (o.has("armoury")) {
+            JsonArray a = o.getAsJsonArray("armoury");
+            s.setArmoury(a.get(0).getAsInt(), a.get(1).getAsInt(), a.get(2).getAsInt());
         }
         return s;
     }

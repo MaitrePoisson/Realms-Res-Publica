@@ -29,6 +29,8 @@ public final class VillageSite {
     private int warReach;
     /** Coordonnées du tonneau-entrepôt, ou {@code null} tant qu'aucun n'est désigné. */
     private int[] warehouse;
+    /** Coordinates of the armoury barrel (guard kit), or {@code null} while there is none. */
+    private int[] armoury;
     /** Coordonnées du bloc d'or de l'Hôtel de Ville, ou {@code null} tant qu'il n'existe pas. */
     private int[] hall;
     /** Doctrine fixée à la fondation de l'Hôtel de Ville, ou {@code null} tant qu'elle n'est pas choisie. */
@@ -91,6 +93,11 @@ public final class VillageSite {
     public void setWarehouse(int bx, int by, int bz) {
         this.warehouse = new int[] {bx, by, bz};
     }
+
+    public int[] armoury() { return armoury == null ? null : armoury.clone(); }
+    public boolean hasArmoury() { return armoury != null; }
+    public void setArmoury(int bx, int by, int bz) { this.armoury = new int[] {bx, by, bz}; }
+    public void clearArmoury() { this.armoury = null; }
 
     private String owner;
 

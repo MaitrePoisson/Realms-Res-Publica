@@ -156,7 +156,7 @@ public final class CrisisService {
     }
 
     /** Message aux joueurs proches du village (rayon + marge) et dans la console. */
-    void tell(VillageSite site, String message) {
+    public void tell(VillageSite site, String message) {
         log.info(message.replaceAll("§.", ""));
         ServerLevel w = Worlds.level(server.get(), site.worldName());
         if (w == null) {

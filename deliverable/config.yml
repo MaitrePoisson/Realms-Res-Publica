@@ -365,5 +365,9 @@ guard_creeper_alert: 16
 guard_flank_distance: 4
 # Number of hostiles from which two guards pin the enemy and a third flanks. [2 ; 20]
 guard_encircle_min: 3
+# Armoury: ticks the local smith spends forging one piece of the guard kit (100 = 5 s). [10 ; 2400]
+forge_ticks: 100
+# Armoury: food rations a guard takes from the warehouse once it is equipped. [0 ; 32]
+guard_rations: 4
 # Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
 biome_overrides: ""

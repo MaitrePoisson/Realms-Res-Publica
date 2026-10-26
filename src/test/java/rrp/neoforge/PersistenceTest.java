@@ -35,6 +35,7 @@ class PersistenceTest {
         s.state().setContestTimer(12.5);
         s.state().setRelations(30);
         s.setWarehouse(3, 64, -7);
+        s.setArmoury(5, 64, 9);
         s.setHall(1, 65, -2);
         s.setOwner("abc");
         s.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.TOWER, 9, 64, -8));
@@ -56,6 +57,8 @@ class PersistenceTest {
         assertEquals(-20.25, r.z());
         assertEquals(3, r.warehouse()[0]);
         assertEquals(-7, r.warehouse()[2]);
+        assertEquals(5, r.armoury()[0]);
+        assertEquals(9, r.armoury()[2]);
         assertEquals(65, r.hall()[1]);
         assertEquals(1, r.orders().size());
         assertEquals(rrp.neoforge.urban.BuildType.TOWER, r.orders().get(0).type());

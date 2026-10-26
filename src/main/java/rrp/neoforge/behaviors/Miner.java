@@ -10,7 +10,11 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import rrp.core.Role;
+import rrp.core.Resource;
+import rrp.core.logistics.Forge;
 import rrp.neoforge.ExploitationWatcher;
+import rrp.neoforge.logistics.Armoury;
+import rrp.neoforge.logistics.CarriedItems;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -30,10 +34,41 @@ public final class Miner extends RoleBehavior {
         return Role.MINER;
     }
 
+    /**
+     * The miner is the village smith: while the guards lack kit pieces and the warehouse can pay for the next one, it
+     * carries the ore (or wood, for a bow) from the warehouse to the armoury, forges there for {@code forge_ticks}
+     * and stocks the piece. Returns true if it fetched material or started forging.
+     */
+    private static boolean smith(BehaviorContext ctx) {
+        var site = ctx.site();
+        var level = ctx.level();
+        var v = ctx.villager();
+        var next = Forge.next(Armoury.needs(site, level));
+        if (next.isEmpty()) {
+            return false;
+        }
+        var cost = Armoury.cost(next.get(), ctx.config());
+        int ore = CarriedItems.count(v, Resource.ORE);
+        int wood = CarriedItems.count(v, Resource.WOOD);
+        if (Forge.affordable(cost, ore, wood)) {
+            return ctx.logistics().requestForge(v, site, level) != null;
+        }
+        Resource lacking = ore < cost.ore() ? Resource.ORE : Resource.WOOD;
+        int want = lacking == Resource.ORE ? cost.ore() - ore : cost.wood() - wood;
+        if (ctx.warehouse().read(site, level).getOrDefault(lacking, 0) < want) {
+            return false; // the warehouse cannot pay for it: back to the rock
+        }
+        var got = ctx.logistics().access().withdraw(v, site, level, lacking, want, true);
+        return got.moved() > 0 || got.tripRequested();
+    }
+
     @Override
     public boolean runOnce(BehaviorContext ctx) {
         if (!ctx.site().hasWarehouse()) {
             return false;
+        }
+        if (ctx.site().hasArmoury() && smith(ctx)) {
+            return true;
         }
         if (!hasRoom(ctx)) {
             return unload(ctx); // full: walk to the warehouse and deposit
