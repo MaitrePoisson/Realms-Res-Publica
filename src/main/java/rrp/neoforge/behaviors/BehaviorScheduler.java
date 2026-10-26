@@ -119,6 +119,10 @@ public final class BehaviorScheduler {
         if (logistics != null && logistics.busy(villager)) {
             return false; // mid-trip to a chest: the trip owns the villager
         }
+        var build = rrp.neoforge.RrpMod.build();
+        if (build != null && build.busy(villager)) {
+            return false; // laying blocks tick by tick: the build driver owns the builder
+        }
         RoleBehavior b = behaviors.get(st.role());
         if (b == null || !b.canWork(st, config.get())) {
             return false;

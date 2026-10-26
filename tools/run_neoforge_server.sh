@@ -94,9 +94,11 @@ VILL=()
 for k in "1 0" "-1 0" "0 1" "0 -1" "2 1" "-2 -1" "1 2" "-1 -2" "3 0" "-3 0"; do VILL+=("summon minecraft:villager ~$(echo $k | cut -d' ' -f1) ~ ~$(echo $k | cut -d' ' -f2) {NoAI:1b}"); done
 # the dummies have no AI and cannot walk to the barrel: the whole group stands within reach of it
 printf 'chest_reach: 6.0
+build_block_ticks: 0
 ' >> run/config/respublica/config.yml
 PHASE_DELAY=0.4 run_phase "$LOG4" "difficulty peaceful" "forceload add -48 -110 80 50" "${VILL[@]}"   "setblock ~2 ~ ~2 minecraft:red_bed[part=head,facing=east]" "setblock ~3 ~ ~3 minecraft:barrel" "${STOCK[@]}"   "rrp village scan" "rrp warehouse set" "rrp townhall build" "rrp village scan"   "execute as @e[type=minecraft:villager,limit=3,sort=nearest] at @s run rrp setrole batisseur" "execute as @e[type=minecraft:villager,limit=2,sort=furthest] at @s run rrp setrole intendant"   "execute as @e[type=minecraft:villager,limit=2,sort=random] at @s run rrp setrole garde" "rrp village scan" "rrp status village-1"   "${ACTS[@]}" "rrp village scan" "rrp status village-1" "tick query" "rrp village flush"
 sed -i '/^chest_reach: 6.0$/d' run/config/respublica/config.yml
+sed -i '/^build_block_ticks: 0$/d' run/config/respublica/config.yml
 if grep -q -E "\[.*/ERROR\].*(rrp|respublica)" "$LOG4"; then echo "SERVER: mod error in log (phase 4)"; grep -E "\[.*/ERROR\]" "$LOG4" | head -5; exit 1; fi
 grep -q "Hôtel de Ville de village-1 posé" "$LOG4" || { echo "SERVER: phase 4 hall not built"; exit 1; }
 BUILT="$(grep "Bâtiments :" "$LOG4" | tail -n1)"

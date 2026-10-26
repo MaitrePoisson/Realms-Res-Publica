@@ -46,8 +46,8 @@ public final class Builder extends RoleBehavior {
     /** Hauteur libre exigée au-dessus du sol (murs de 2 + toit). */
     static final int HEIGHT = 3;
 
-    /** Pas de chantier (rangées) réalisés à chaque action du bâtisseur. */
-    static final int STEPS_PER_ACTION = 6;
+    /** Pas de chantier (rangées de nivellement ou blocs) réalisés à chaque action du bâtisseur en mode instantané ({@code build_block_ticks} = 0). */
+    static final int STEPS_PER_ACTION = 40;
     /** Distance maximale (anneaux) de la recherche d'emplacement autour de la cible de l'ordre. */
     static final int SEARCH_RING = 14;
     /** Nombre maximal de routes par village. */
@@ -153,6 +153,10 @@ public final class Builder extends RoleBehavior {
         if (!reachSite(ctx, cs)) {
             return true; // on its way to the site
         }
+        var build = rrp.neoforge.RrpMod.build();
+        if (build != null && build.visible()) {
+            return layBlockByBlock(ctx, build, cs, template.get(), started);
+        }
         int made = cs.advance(ctx.level(), template.get(), ctx.villager(), STEPS_PER_ACTION, supplyOf(ctx));
         if (cs.done(template.get())) {
             finish(ctx, cs, template.get());
@@ -166,6 +170,33 @@ public final class Builder extends RoleBehavior {
             ctx.registry().markDirty();
         }
         return made > 0 || started;
+    }
+
+    /**
+     * Visible mode: the {@link rrp.neoforge.building.BuildDriver} lays the site one block every {@code build_block_ticks}.
+     * This action only hands it the site once the builder carries what the next block costs; short of materials it goes
+     * to the warehouse instead (the driver stops by itself when the arms run empty and calls this again).
+     */
+    private boolean layBlockByBlock(BehaviorContext ctx, rrp.neoforge.building.BuildDriver build, ConstructionSite cs,
+                                    net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate t, boolean started) {
+        if (cs.done(t)) {
+            finish(ctx, cs, t);
+            return true;
+        }
+        if (build.busy(ctx.villager())) {
+            return true;
+        }
+        var supply = supplyOf(ctx);
+        if (supply.has(cs.woodForStep(t), cs.stoneForStep(t))) {
+            build.start(ctx.villager(), ctx.site(), ctx.level(), cs, t, supply);
+            ctx.registry().markDirty();
+            return true;
+        }
+        if (fetchFor(ctx, cs, t)) {
+            ctx.registry().markDirty();
+            return true; // short of materials: off to the warehouse
+        }
+        return started;
     }
 
     /** Prend le premier ordre, trouve son emplacement et retire les matériaux du stock. Faux si impossible pour l'instant. */

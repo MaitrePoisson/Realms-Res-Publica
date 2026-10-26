@@ -42,6 +42,7 @@ public final class RrpMod {
     private static ActionBarService actionBar;
     private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
     private static rrp.neoforge.logistics.LogisticsDriver logistics;
+    private static rrp.neoforge.building.BuildDriver build;
     private static rrp.neoforge.tactics.GuardAi guardAi;
     private static CrisisService crises;
     private static WarService war;
@@ -75,6 +76,7 @@ public final class RrpMod {
     public static ActionBarService actionBar() { return actionBar; }
     public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
     public static rrp.neoforge.logistics.LogisticsDriver logistics() { return logistics; }
+    public static rrp.neoforge.building.BuildDriver build() { return build; }
     public static rrp.neoforge.tactics.GuardAi guardAi() { return guardAi; }
     public static CrisisService crises() { return crises; }
     public static WarService war() { return war; }
@@ -113,6 +115,7 @@ public final class RrpMod {
         behaviors = new rrp.neoforge.behaviors.BehaviorScheduler(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         logistics = new rrp.neoforge.logistics.LogisticsDriver(RrpMod::simConfig,
                 new rrp.neoforge.logistics.ChestAccess(RrpMod::simConfig, WAREHOUSE, REGISTRY));
+        build = new rrp.neoforge.building.BuildDriver(RrpMod::simConfig);
         guardAi = new rrp.neoforge.tactics.GuardAi(RrpMod::simConfig, RrpMod::server, REGISTRY, adapter);
         crises = new CrisisService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter, RrpMod::lang, LOG);
         war = new WarService(RrpMod::simConfig, RrpMod::server, REGISTRY, adapter, crises, RrpMod::lang, LOG);
@@ -131,6 +134,7 @@ public final class RrpMod {
         actionBar.onTicks(t);
         births.onTicks(t);
         logistics.onTicks(t);
+        build.onTicks(t);
         guardAi.onTicks(t);
         behaviors.onTicks(t);
         crises.onTicks(t);
@@ -180,6 +184,9 @@ public final class RrpMod {
         TICKS.unregister(worldTimer);
         if (logistics != null) {
             logistics.closeAll();
+        }
+        if (build != null) {
+            build.closeAll();
         }
         if (guardAi != null) {
             guardAi.reset();

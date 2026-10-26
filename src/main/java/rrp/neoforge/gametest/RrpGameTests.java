@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.entity.BarrelBlockEntity;
 import net.minecraft.world.level.block.state.properties.BedPart;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 import rrp.core.Role;
@@ -386,6 +387,7 @@ public final class RrpGameTests {
         while (again.construction() != null && guard++ < 80) {
             for (Villager v : RrpMod.adapter().present(again, level)) {
                 RrpMod.behaviors().runOnce(again, level, v);
+                settleBuild(v);
                 settleTrip(v, WarehouseService.barrel(again, level).getBlockPos());
             }
         }
@@ -396,7 +398,11 @@ public final class RrpGameTests {
         h.assertTrue(guard > 1, "construction took several actions");
         h.assertTrue(again.orders().isEmpty(), "order completed");
         h.assertTrue(again.built().getOrDefault(rrp.neoforge.urban.BuildType.HOUSE, 0) == 1, "built counter");
-        h.assertTrue(again.state().beds() > beds, "beds counted");
+        int bedsFound = 0;
+        for (int dx = 0; dx < 12; dx++) for (int dy = 0; dy < 6; dy++) for (int dz = 0; dz < 12; dz++) {
+            if (level.getBlockState(origin.offset(dx, dy, dz)).getBlock() instanceof net.minecraft.world.level.block.BedBlock) bedsFound++;
+        }
+        h.assertTrue(again.state().beds() > beds, "beds counted " + again.state().beds() + "/" + beds + " found " + bedsFound);
         h.assertTrue(level.getBlockState(origin.offset(0, 1, 0)).is(Blocks.OAK_LOG), "house corner placed");
         h.assertTrue(level.getBlockState(origin.offset(1, 1, 4)).getBlock() instanceof BedBlock, "bed placed");
         h.assertTrue(level.getBlockState(origin.offset(-1, 1, -1)).isAir() || level.getBlockState(origin.offset(-1, 1, -1)).canBeReplaced(),
@@ -1828,6 +1834,125 @@ public final class RrpGameTests {
         }
     }
 
+    /** Lets a builder with a job lay its blocks, tick after tick (the sync tests drive the build driver by hand). */
+    private static void settleBuild(Villager v) {
+        var build = RrpMod.build();
+        for (int i = 0; i < 40000 && build.busy(v); i++) {
+            build.onTicks(1);
+        }
+    }
+
+    // ---------- the builder lays the blocks one by one (M78) ----------
+
+    @GameTest(template = ARENA, timeoutTicks = 600, batch = "buildvisible")
+    public static void buildvisible(GameTestHelper h) {
+        try {
+            buildvisibleBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void buildvisibleBody(GameTestHelper h) {
+        // leftovers of other tests stand above the arena (the ground search looks 10 blocks up): free air over the whole arena
+        for (int x = 0; x <= 23; x++) {
+            for (int z = 0; z <= 23; z++) {
+                h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+                for (int y = 1; y <= 12; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        level.getEntitiesOfClass(Villager.class, h.getBounds()).stream().skip(1).forEach(Villager::discard);
+        Villager v = mine(h);
+        BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        BlockPos at = h.absolutePos(new BlockPos(8, 1, 6));
+        site.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.HOUSE, at.getX(), at.getY(), at.getZ()));
+        setAll(h, Role.BUILDER);
+        var barrel = WarehouseService.barrel(site, level);
+        barrel.setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        RrpMod.warehouse().refresh(site, level);
+        var build = RrpMod.build();
+        int pace = (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.BUILD_BLOCK_TICKS);
+        h.assertTrue(build.visible() && pace > 0, "the visible mode is on by default");
+        long placed0 = build.placed();
+        int beds = site.state().beds();
+        for (int i = 0; i < 20 && !build.busy(v); i++) {
+            RrpMod.behaviors().runOnce(site, level, v);
+            settleTrip(v, barrel.getBlockPos());
+        }
+        h.assertTrue(build.busy(v), "the builder has a job");
+        h.assertTrue(!RrpMod.behaviors().work(site, level, v), "a builder with a job is left alone by the scheduler");
+        var cs = site.construction();
+        var template = rrp.neoforge.urban.BlueprintPool.load(level, rrp.neoforge.urban.BlueprintPool.Kind.of(cs.type()), cs.origin()).orElseThrow();
+        var blocks = rrp.neoforge.building.BuildBlocks.of(template);
+        int levelSteps = rrp.neoforge.urban.ConstructionSite.totalSteps(template) - blocks.size();
+        h.assertTrue(blocks.size() > 30, "the plan has many blocks: " + blocks.size());
+        BlockPos origin = cs.origin();
+        BlockPos barrelPos = barrel.getBlockPos();
+        // the levelling rows go at the same pace and lay no block of the plan
+        buildTicks(site, level, v, barrelPos, pace * (levelSteps - 1));
+        h.assertTrue(build.placed() == placed0 && build.levelled() > 0 && cs.step() < levelSteps, "still levelling: " + cs.step() + "/" + levelSteps);
+        // then one block every `pace` ticks, bottom layer first
+        buildTicks(site, level, v, barrelPos, pace * 8 + 2);
+        long placed = build.placed() - placed0;
+        h.assertTrue(placed >= 5 && placed <= 8, "only the first blocks exist: " + placed);
+        int topY = blocks.get(blocks.size() - 1).y();
+        h.assertTrue(blocks.get(0).y() == 0, "the plan starts with its bottom layer");
+        h.assertTrue(level.getBlockState(blocks.get(0).at(origin)).is(blocks.get(0).state().getBlock()), "the first block is laid");
+        h.assertTrue(blocks.stream().filter(e -> e.y() == topY).noneMatch(e -> level.getBlockState(e.at(origin)).is(e.state().getBlock())),
+                "nothing of the top layer yet");
+        var next = cs.nextBlock(template);
+        h.assertTrue(next != null && v.getMainHandItem().is(next.state().getBlock().asItem()), "the hand holds the block item");
+        // a being in the way: the builder waits, nothing is walled in, then goes on
+        var cow = net.minecraft.world.entity.EntityType.COW.create(level);
+        cow.setPos(Vec3.atBottomCenterOf(next.at(origin)));
+        cow.setNoAi(true);
+        level.addFreshEntity(cow);
+        long waits = build.waits();
+        long before = build.placed();
+        buildTicks(site, level, v, barrelPos, pace * 4);
+        h.assertTrue(build.placed() == before && build.waits() > waits, "it waits while something stands in the next block");
+        cow.discard();
+        buildTicks(site, level, v, barrelPos, pace * 2);
+        h.assertTrue(build.placed() > before, "it goes on once the way is free");
+        // a restart in the middle resumes at the same block
+        int step = cs.step();
+        h.assertTrue(RrpMod.persistence().flush(), "flush");
+        RrpMod.persistence().load();
+        VillageSite again = RrpMod.registry().all().stream().filter(x -> x.id().equals(site.id())).findFirst().orElseThrow();
+        h.assertTrue(again.construction() != null && again.construction().step() == step, "the block index survives the reload");
+        build.onTicks(1); // the job of the old site ends
+        h.assertTrue(!build.busy(v), "the old job is dropped");
+        for (int i = 0; i < 80 && again.construction() != null; i++) {
+            RrpMod.behaviors().runOnce(again, level, v);
+            settleBuild(v);
+            settleTrip(v, barrel.getBlockPos());
+        }
+        h.assertTrue(again.construction() == null, "the house is finished");
+        h.assertTrue(blocks.stream().allMatch(e -> level.getBlockState(e.at(origin)).is(e.state().getBlock())), "every block of the plan stands");
+        h.assertTrue(again.state().beds() > beds, "beds counted");
+        h.assertTrue(again.built().getOrDefault(rrp.neoforge.urban.BuildType.HOUSE, 0) == 1, "built counter");
+        h.assertTrue(!build.busy(v), "released");
+        h.succeed();
+    }
+
+    /** Ticks the build driver {@code n} times; a builder whose job stopped for lack of logs goes to the barrel and comes back. */
+    private static void buildTicks(VillageSite site, ServerLevel level, Villager v, BlockPos barrel, int n) {
+        var build = RrpMod.build();
+        for (int i = 0; i < n; i++) {
+            if (!build.busy(v) && site.construction() != null) {
+                RrpMod.behaviors().runOnce(site, level, v);
+                settleTrip(v, barrel);
+            }
+            build.onTicks(1);
+        }
+    }
+
     // ---------- the builder fetches its materials on foot (M71) ----------
 
     @GameTest(template = ARENA, timeoutTicks = 600, batch = "builderfoot")
@@ -1898,6 +2023,7 @@ public final class RrpGameTests {
             int before = inStock(site, level, Resource.WOOD);
             int carriedBefore = carried(v, Resource.WOOD);
             RrpMod.behaviors().runOnce(site, level, v);
+            settleBuild(v);
             if (!logi.busy(v)) {
                 h.assertTrue(inStock(site, level, Resource.WOOD) == before, "the stock only moves through trips");
                 toSite(v, site);
