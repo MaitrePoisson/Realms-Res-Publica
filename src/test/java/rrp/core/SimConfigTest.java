@@ -27,7 +27,7 @@ class SimConfigTest {
     private static Map<String, Double> flatValues(List<String> lines) {
         Map<String, Double> m = new LinkedHashMap<>();
         for (String l : lines) {
-            if (l.startsWith("#") || l.isBlank() || l.startsWith("biome_overrides:")) {
+            if (l.startsWith("#") || l.isBlank() || l.startsWith("biome_overrides:") || l.startsWith("guard_heal_items:")) {
                 continue;
             }
             String[] kv = l.split(":", 2);

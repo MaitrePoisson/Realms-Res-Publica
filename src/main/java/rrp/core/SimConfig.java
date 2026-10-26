@@ -200,7 +200,10 @@ public final class SimConfig {
         FORGE_TICKS(100, 10, 2400),
         GUARD_RATIONS(4, 0, 32),
         GUARD_RELOAD_TICKS(40, 10, 200),
-        GUARD_SHIELD_ARC(120, 30, 180);
+        GUARD_SHIELD_ARC(120, 30, 180),
+        GUARD_CREEPER_CLOSE(6, 2, 12),
+        GUARD_CREEPER_REDUCTION(60, 0, 100),
+        GUARD_HEAL_AMOUNT(6, 1, 20);
 
         private final double def;
         private final double min;
@@ -225,6 +228,10 @@ public final class SimConfig {
     private final EnumMap<Key, Double> values = new EnumMap<>(Key.class);
     private final List<String> warnings = new ArrayList<>();
     private String biomeOverrides = "";
+    private String guardHealItems = DEFAULT_HEAL_ITEMS;
+
+    /** Default {@code guard_heal_items}: what a wounded guard may use from the barracks stock. */
+    public static final String DEFAULT_HEAL_ITEMS = "minecraft:golden_apple, minecraft:honey_bottle, minecraft:paper";
 
     private SimConfig() {
         for (Key k : Key.values()) {
@@ -249,6 +256,10 @@ public final class SimConfig {
         for (Map.Entry<String, ?> e : raw.entrySet()) {
             if ("biome_overrides".equals(e.getKey())) {
                 c.biomeOverrides = String.valueOf(e.getValue());
+                continue;
+            }
+            if ("guard_heal_items".equals(e.getKey())) {
+                c.guardHealItems = String.valueOf(e.getValue());
                 continue;
             }
             Key key = find(e.getKey());
@@ -284,6 +295,11 @@ public final class SimConfig {
         return biomeOverrides;
     }
 
+    /** Raw {@code guard_heal_items} text: comma-separated item ids (the "bandages" of the barracks stock). */
+    public String guardHealItems() {
+        return guardHealItems;
+    }
+
     public double get(Key k) {
         return values.get(k);
     }
@@ -305,6 +321,7 @@ public final class SimConfig {
         SimConfig c = new SimConfig();
         c.values.putAll(values);
         c.biomeOverrides = biomeOverrides;
+        c.guardHealItems = guardHealItems;
         c.values.put(k, v);
         return c;
     }

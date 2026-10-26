@@ -113,7 +113,7 @@ public final class RrpGameTests {
         // arenas share the world: take the village nearest to this arena, not whichever the registry lists first
         VillageSite site = RrpMod.registry().all().stream()
                 .min(java.util.Comparator.comparingDouble(v -> Math.hypot(v.x() - b.getX(), v.z() - b.getZ()))).orElse(null);
-        h.assertTrue(site != null, "no village created by the scan");
+        h.assertTrue(site != null, "no village created by the scan (villagers " + h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds()).size() + ", registry " + RrpMod.registry().all().size() + ", barrel " + b + ", chunk " + h.getLevel().getChunkSource().getChunkNow(b.getX() >> 4, b.getZ() >> 4) + ")");
         RrpMod.warehouse().set(site, h.getLevel(), b);
         RrpMod.warehouse().refresh(site, h.getLevel());
         return site;
@@ -2169,6 +2169,18 @@ public final class RrpGameTests {
 
     /** Open ground for a fight: stone floor, free air, a village of two villagers (a guard and a farmer). */
     private static VillageSite combatVillage(GameTestHelper h, Villager[] who) {
+        return combatVillage(h, who, 2);
+    }
+
+    /** Same, with {@code count} villagers: {@code who} gets the first ones (the first is a guard, the others farmers). */
+    private static VillageSite combatVillage(GameTestHelper h, Villager[] who, int count) {
+        // the scanner only reads chunks that are already loaded: the first batch after the server starts runs before them
+        AABB area = h.getBounds();
+        for (int cx = (int) Math.floor(area.minX) >> 4; cx <= (int) Math.floor(area.maxX) >> 4; cx++) {
+            for (int cz = (int) Math.floor(area.minZ) >> 4; cz <= (int) Math.floor(area.maxZ) >> 4; cz++) {
+                h.getLevel().getChunk(cx, cz);
+            }
+        }
         for (int x = 0; x <= 26; x++) {
             for (int z = 4; z <= 20; z++) {
                 h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
@@ -2177,18 +2189,23 @@ public final class RrpGameTests {
                 }
             }
         }
-        VillageSite site = village(h, 2, 0, 0);
+        // the scan creates no village without a bed: only the first test of the run, with an empty registry, needs one
+        VillageSite site = village(h, count, RrpMod.registry().all().isEmpty() ? 1 : 0, 0);
         ServerLevel level = h.getLevel();
         var vs = level.getEntitiesOfClass(Villager.class, h.getBounds());
-        who[0] = vs.get(0);
-        who[1] = vs.get(1);
-        for (Villager other : RrpMod.adapter().present(site, level)) {
-            if (other != who[0] && other != who[1]) {
+        for (int i = 0; i < who.length; i++) {
+            who[i] = vs.get(i);
+        }
+        List<Villager> mine = List.of(who);
+        for (Villager other : vs) { // this arena only: the neighbouring arenas run their own guards at the same time
+            if (!mine.contains(other)) {
                 RrpMod.adapter().setRole(other, Role.FARMER);
             }
         }
         RrpMod.adapter().setRole(who[0], Role.GUARD);
-        RrpMod.adapter().setRole(who[1], Role.FARMER);
+        for (int i = 1; i < who.length; i++) {
+            RrpMod.adapter().setRole(who[i], Role.FARMER);
+        }
         for (Villager v : who) {
             v.setNoAi(false);
         }
@@ -2217,7 +2234,9 @@ public final class RrpGameTests {
         put(h, who[1], 2, 6);
         var zombie = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(14, 1, 12)));
         h.onEachTick(() -> h.assertTrue(!guard.getBrain().isActive(net.minecraft.world.entity.schedule.Activity.PANIC),
-                "a guard never panics"));
+                "a guard never panics (tick " + h.getTick() + ", health " + guard.getHealth() + ", role " + RrpMod.adapter().stateOf(guard).role()
+                        + ", stripped " + rrp.neoforge.tactics.CivilianReaction.stripped(guard) + ", noAi " + guard.isNoAi()
+                        + ", activities " + guard.getBrain().getActiveActivities() + ")"));
         h.succeedWhen(() -> {
             h.assertTrue(!zombie.isAlive(), "the guard stood its ground and killed the zombie");
             h.assertTrue(guard.isAlive(), "the guard survived");
@@ -2294,5 +2313,126 @@ public final class RrpGameTests {
         guard.hurt(front, 2);
         h.assertTrue(guard.getHealth() < after, "with the shield down nothing is blocked");
         h.succeed();
+    }
+
+    // ---------- anti-creeper, encirclement and tactical retreat (M74) ----------
+
+    @GameTest(template = ARENA, timeoutTicks = 500, batch = "m74archer")
+    public static void archerShootsCreeper(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager archer = who[0];
+        put(h, who[1], 2, 6);
+        put(h, archer, 2, 12);
+        archer.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        archer.getInventory().addItem(new ItemStack(Items.ARROW, 16));
+        Creeper creeper = h.spawn(EntityType.CREEPER, new BlockPos(14, 1, 12));
+        creeper.setNoAi(true);
+        long before = RrpMod.guardAi().arrows();
+        h.succeedWhen(() -> {
+            h.assertTrue(RrpMod.guardAi().arrows() > before, "the archer shot at the creeper before it could ignite");
+            h.assertTrue(creeper.getHealth() < creeper.getMaxHealth() || !creeper.isAlive(),
+                    "an arrow hit the creeper at 12 blocks (health " + creeper.getHealth() + ")");
+            h.assertTrue(archer.getHealth() == archer.getMaxHealth(), "the archer was never touched");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 400, batch = "m74creeper")
+    public static void creeperHeld(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager guard = who[0];
+        Villager control = who[1];
+        control.setNoAi(true);
+        put(h, guard, 13, 12);
+        put(h, control, 7, 12);
+        Creeper creeper = h.spawn(EntityType.CREEPER, new BlockPos(10, 1, 12));
+        creeper.setNoAi(true);
+        creeper.ignite();
+        long before = rrp.neoforge.tactics.CreeperGuard.absorbed();
+        double[] start = {guard.getX(), guard.getZ()};
+        double[] drift = {0};
+        h.onEachTick(() -> drift[0] = Math.max(drift[0], Math.hypot(guard.getX() - start[0], guard.getZ() - start[1])));
+        h.succeedWhen(() -> {
+            h.assertTrue(creeper.isRemoved(), "the creeper exploded");
+            float guardLoss = guard.getMaxHealth() - guard.getHealth();
+            float controlLoss = control.isAlive() ? control.getMaxHealth() - control.getHealth() : control.getMaxHealth();
+            h.assertTrue(rrp.neoforge.tactics.CreeperGuard.absorbed() > before, "the holding guard absorbed the blast");
+            h.assertTrue(controlLoss > 5, "the blast hurts (control lost " + controlLoss + ")");
+            h.assertTrue(guard.isAlive() && guardLoss < controlLoss * 0.6,
+                    "explosion damage reduced (guard lost " + guardLoss + ", control " + controlLoss + ")");
+            h.assertTrue(drift[0] < 0.8, "no step back and no knockback (drifted " + drift[0] + ")");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 700, batch = "m74squad")
+    public static void encirclement(GameTestHelper h) {
+        Villager[] who = new Villager[4];
+        combatVillage(h, who, 4);
+        Villager a = who[0];
+        Villager b = who[1];
+        Villager c = who[2];
+        RrpMod.adapter().setRole(b, Role.GUARD);
+        RrpMod.adapter().setRole(c, Role.GUARD);
+        put(h, who[3], 2, 6);
+        put(h, a, 10, 11);
+        put(h, b, 10, 15);
+        put(h, c, 6, 13);
+        var z1 = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(14, 1, 13)));
+        var z2 = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(15, 1, 15)));
+        var z3 = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(15, 1, 11)));
+        for (var z : List.of(z1, z2, z3)) {
+            z.setNoAi(true);
+        }
+        double behind = h.absolutePos(new BlockPos(15, 1, 13)).getX(); // the first zombie stands at x 14
+        double[] farthest = {-1e9};
+        h.onEachTick(() -> farthest[0] = Math.max(farthest[0], c.getX()));
+        h.succeedWhen(() -> {
+            h.assertTrue(RrpMod.guardAi().flankManeuvers() >= 1, "a guard was sent round the enemy");
+            h.assertTrue(farthest[0] > behind, "the flanker went round and stood behind the enemy (x " + farthest[0] + " > " + behind + ")");
+            h.assertTrue(!z1.isAlive() && !z2.isAlive() && !z3.isAlive(), "the group was destroyed");
+            h.assertTrue(a.isAlive() && b.isAlive() && c.isAlive(), "no guard lost");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 800, batch = "m74retreat")
+    public static void retreat(GameTestHelper h) {
+        Villager[] who = new Villager[4];
+        VillageSite site = combatVillage(h, who, 4);
+        Villager wounded = who[0];
+        Villager b = who[1];
+        Villager c = who[2];
+        RrpMod.adapter().setRole(b, Role.GUARD);
+        RrpMod.adapter().setRole(c, Role.GUARD);
+        put(h, who[3], 2, 6);
+        for (Villager g : List.of(wounded, b, c)) {
+            g.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.IRON_SWORD));
+        }
+        BlockPos stock = barrel(h, 3, 12, 0);
+        site.setArmoury(stock.getX(), stock.getY(), stock.getZ());
+        ((Container) h.getBlockEntity(new BlockPos(3, 1, 12))).setItem(0, new ItemStack(Items.PAPER, 4));
+        put(h, wounded, 12, 12);
+        put(h, b, 11, 9);
+        put(h, c, 11, 15);
+        wounded.setHealth(4); // 20 %
+        var zombie = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(18, 1, 12)));
+        zombie.setNoAi(true);
+        zombie.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(4000);
+        zombie.setHealth(4000);
+        boolean[] behindLine = {false};
+        double[] closest = {1e9};
+        h.onEachTick(() -> {
+            if (zombie.isAlive() && wounded.distanceTo(zombie) > Math.max(b.distanceTo(zombie), c.distanceTo(zombie))) {
+                behindLine[0] = true;
+            }
+            closest[0] = Math.min(closest[0], wounded.distanceTo(zombie));
+        });
+        h.succeedWhen(() -> {
+            h.assertTrue(RrpMod.guardAi().retreat().withdrawals() >= 1, "the wounded guard withdrew");
+            h.assertTrue(behindLine[0], "it fell back behind the line of its comrades");
+            h.assertTrue(closest[0] > 4.5, "it never ran at the enemy (closest " + closest[0] + ")");
+            h.assertTrue(RrpMod.guardAi().retreat().healed() >= 1, "it healed with an item of the barracks stock");
+            h.assertTrue(wounded.isAlive() && wounded.getHealth() > 4, "its health is back (" + wounded.getHealth() + ")");
+        });
     }
 }

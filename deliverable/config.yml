@@ -373,5 +373,13 @@ guard_rations: 4
 guard_reload_ticks: 40
 # Melee guards: total front arc (degrees) of the raised shield; projectiles from inside it are blocked. [30 ; 180]
 guard_shield_arc: 120
+# Anti-creeper: a creeper closer than this (blocks) is met with a raised shield held in place; farther, archers shoot it.
+guard_creeper_close: 6
+# Anti-creeper: share (percent) of an explosion's damage absorbed by a guard that holds its shield; its knockback is cancelled. [0 ; 100]
+guard_creeper_reduction: 60
+# Wounded guards: health points restored by one healing item taken from the barracks stock. [1 ; 20]
+guard_heal_amount: 6
+# Wounded guards: items (comma-separated ids, the "bandages") a withdrawn guard uses from the barracks stock; without any it heals slowly.
+guard_heal_items: "minecraft:golden_apple, minecraft:honey_bottle, minecraft:paper"
 # Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
 biome_overrides: ""

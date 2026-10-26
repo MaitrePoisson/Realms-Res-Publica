@@ -74,6 +74,8 @@ public final class GuardAi {
     private final Map<UUID, ArcherCycle> cycles = new HashMap<>();
     private final Map<UUID, Long> nextStrike = new HashMap<>();
     private final Map<UUID, Integer> patrolStep = new HashMap<>();
+    private final SquadTactics squad = new SquadTactics();
+    private final Retreat retreat = new Retreat();
     private long accumulated;
     private long arrows;
 
@@ -88,6 +90,21 @@ public final class GuardAi {
     /** Arrows loosed by guards since the start (tests, diagnostic). */
     public long arrows() {
         return arrows;
+    }
+
+    /** Tactical retreat of the wounded guards (tests, diagnostic). */
+    public Retreat retreat() {
+        return retreat;
+    }
+
+    /** Encirclements started since the start (tests, diagnostic). */
+    public long flankManeuvers() {
+        return squad.maneuvers();
+    }
+
+    /** Flank stage of a guard: 0 going round, 1 to the point behind the enemy, 2 attacking from behind. */
+    public int flankStage(Villager v) {
+        return squad.stageOf(v);
     }
 
     /** True while this guard holds its shield up (its front arc blocks projectiles). */
@@ -118,6 +135,9 @@ public final class GuardAi {
         cycles.clear();
         nextStrike.clear();
         patrolStep.clear();
+        squad.reset();
+        retreat.reset();
+        CreeperGuard.reset();
         accumulated = 0;
     }
 
@@ -139,7 +159,7 @@ public final class GuardAi {
     }
 
     /** One decision of a guard, computed before anybody moves so comrades can be compared. */
-    private record Engagement(Villager guard, Mob target, double dist, Posture posture, boolean archer) { }
+    record Engagement(Villager guard, Mob target, double dist, Posture posture, boolean archer, int hostiles) { }
 
     private void runSite(VillageSite site, ServerLevel level, int ticks) {
         SimConfig cfg = config.get();
@@ -154,9 +174,17 @@ public final class GuardAi {
             return;
         }
         guards.sort(Comparator.comparing(Villager::getUUID));
+        List<Villager> standing = new ArrayList<>();
+        List<Villager> withdrawn = new ArrayList<>();
+        for (Villager v : guards) {
+            (retreat.update(v, cfg) ? withdrawn : standing).add(v);
+        }
+        for (Villager w : withdrawn) {
+            retreat.step(site, level, w, standing, ticks, cfg);
+        }
         List<Engagement> engaged = new ArrayList<>();
         List<Villager> free = new ArrayList<>();
-        for (Villager v : guards) {
+        for (Villager v : standing) {
             Engagement e = engagement(site, level, v, cfg);
             if (e == null) {
                 free.add(v);
@@ -164,8 +192,9 @@ public final class GuardAi {
                 engaged.add(e);
             }
         }
+        SquadTactics.Plan plan = squad.plan(site.id(), engaged, cfg);
         for (Engagement e : engaged) {
-            act(site, level, e, engaged, ticks, cfg);
+            act(site, level, e, engaged, plan, ticks, cfg);
         }
         List<Villager> patrol = new ArrayList<>();
         for (Villager v : free) {
@@ -242,15 +271,28 @@ public final class GuardAi {
         }
         Mob target = byId.get(top.id());
         Posture p = GuardPosture.choose(archer, Guard.tower(site, v) != null, top.distance(), range);
-        return new Engagement(v, target, top.distance(), p, archer);
+        return new Engagement(v, target, top.distance(), p, archer, threats.size());
     }
 
-    private void act(VillageSite site, ServerLevel level, Engagement e, List<Engagement> all, int ticks, SimConfig cfg) {
+    private void act(VillageSite site, ServerLevel level, Engagement e, List<Engagement> all, SquadTactics.Plan plan,
+                     int ticks, SimConfig cfg) {
         Villager g = e.guard();
         Mob target = e.target();
         g.getLookControl().setLookAt(target, 30, 30);
         ArcherCycle cycle = cycles.computeIfAbsent(g.getUUID(),
                 k -> new ArcherCycle(cfg.getInt(SimConfig.Key.GUARD_RELOAD_TICKS)));
+        if (target instanceof Creeper && e.dist() <= cfg.get(SimConfig.Key.GUARD_CREEPER_CLOSE)) {
+            // too close to shoot safely: hold the ground behind the shield (no step back, blast cut, no knockback)
+            cycle.advance(ticks, false);
+            g.setShiftKeyDown(false);
+            raiseShield(g);
+            CreeperGuard.hold(g);
+            g.getNavigation().stop();
+            if (e.dist() <= REACH) {
+                strike(site, level, g, target);
+            }
+            return;
+        }
         if (e.posture() == Posture.SHOOT && g.hasLineOfSight(target)) {
             lowerShield(g);
             g.getNavigation().stop();
@@ -264,7 +306,20 @@ public final class GuardAi {
         cycle.advance(ticks, false);
         g.setShiftKeyDown(false);
         raiseShield(g);
-        if (e.dist() <= REACH) {
+        if (squad.maneuvering(plan, g)) {
+            squad.flank(level, plan, cfg); // round the side, then behind the enemy
+            return;
+        }
+        double dist = e.dist();
+        if (plan != null && g == plan.flanker()) {
+            target = plan.enemy(); // in position: hit it from behind
+            dist = g.distanceTo(target);
+        }
+        if (!e.archer() && squad.pinning(site.id(), plan, e, ticks)) {
+            g.getNavigation().stop(); // fixing the enemy behind the shield while the flanker comes round
+            return;
+        }
+        if (dist <= REACH) {
             g.getNavigation().stop();
             strike(site, level, g, target);
             return;
