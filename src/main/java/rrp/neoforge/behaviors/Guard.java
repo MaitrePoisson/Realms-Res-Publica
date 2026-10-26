@@ -17,7 +17,7 @@ import java.util.Optional;
 public final class Guard extends RoleBehavior {
 
     /** Dégâts d'une frappe de garde : de quoi abattre un monstre courant d'un coup. */
-    static final float STRIKE_DAMAGE = 20;
+    public static final float STRIKE_DAMAGE = 20;
 
     /** Portée d'une frappe supplémentaire, en blocs, d'un garde posté sur une tour. */
     static final int TOWER_BONUS = 8;
@@ -26,8 +26,13 @@ public final class Guard extends RoleBehavior {
 
     /** Tour de guet de ce garde (répartition stable par identifiant), ou {@code null} si le village n'en a pas. */
     static int[] tower(BehaviorContext ctx) {
-        var towers = ctx.site().defense().towers();
-        return towers.isEmpty() ? null : towers.get(Math.floorMod(ctx.villager().getUUID().hashCode(), towers.size()));
+        return tower(ctx.site(), ctx.villager());
+    }
+
+    /** Tour de guet de ce garde, ou {@code null} si le village n'en a pas. */
+    public static int[] tower(rrp.neoforge.VillageSite site, net.minecraft.world.entity.npc.Villager v) {
+        var towers = site.defense().towers();
+        return towers.isEmpty() ? null : towers.get(Math.floorMod(v.getUUID().hashCode(), towers.size()));
     }
 
     @Override
@@ -103,7 +108,7 @@ public final class Guard extends RoleBehavior {
         }
         Mob monster = target.get();
         if (!ctx.villager().isNoAi()) {
-            ctx.villager().getNavigation().moveTo(monster, 0.5);
+            return true; // a guard with an AI fights through the real-time GuardAi (arrows, shield, advance)
         }
         monster.hurt(ctx.level().damageSources().mobAttack(ctx.villager()), STRIKE_DAMAGE);
         if (!monster.isAlive()) {

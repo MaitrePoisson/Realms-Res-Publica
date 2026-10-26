@@ -42,6 +42,7 @@ public final class RrpMod {
     private static ActionBarService actionBar;
     private static rrp.neoforge.behaviors.BehaviorScheduler behaviors;
     private static rrp.neoforge.logistics.LogisticsDriver logistics;
+    private static rrp.neoforge.tactics.GuardAi guardAi;
     private static CrisisService crises;
     private static WarService war;
     private static Persistence persistence;
@@ -74,6 +75,7 @@ public final class RrpMod {
     public static ActionBarService actionBar() { return actionBar; }
     public static rrp.neoforge.behaviors.BehaviorScheduler behaviors() { return behaviors; }
     public static rrp.neoforge.logistics.LogisticsDriver logistics() { return logistics; }
+    public static rrp.neoforge.tactics.GuardAi guardAi() { return guardAi; }
     public static CrisisService crises() { return crises; }
     public static WarService war() { return war; }
     public static Persistence persistence() { return persistence; }
@@ -111,6 +113,7 @@ public final class RrpMod {
         behaviors = new rrp.neoforge.behaviors.BehaviorScheduler(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter);
         logistics = new rrp.neoforge.logistics.LogisticsDriver(RrpMod::simConfig,
                 new rrp.neoforge.logistics.ChestAccess(RrpMod::simConfig, WAREHOUSE, REGISTRY));
+        guardAi = new rrp.neoforge.tactics.GuardAi(RrpMod::simConfig, RrpMod::server, REGISTRY, adapter);
         crises = new CrisisService(RrpMod::simConfig, RrpMod::server, REGISTRY, WAREHOUSE, adapter, RrpMod::lang, LOG);
         war = new WarService(RrpMod::simConfig, RrpMod::server, REGISTRY, adapter, crises, RrpMod::lang, LOG);
         persistence = new Persistence(REGISTRY, server.getWorldPath(LevelResource.ROOT).resolve(MOD_ID), LOG);
@@ -128,6 +131,7 @@ public final class RrpMod {
         actionBar.onTicks(t);
         births.onTicks(t);
         logistics.onTicks(t);
+        guardAi.onTicks(t);
         behaviors.onTicks(t);
         crises.onTicks(t);
         war.onTicks(t);
@@ -176,6 +180,9 @@ public final class RrpMod {
         TICKS.unregister(worldTimer);
         if (logistics != null) {
             logistics.closeAll();
+        }
+        if (guardAi != null) {
+            guardAi.reset();
         }
         CaravanService.abortAll(REGISTRY);
         if (persistence != null) {

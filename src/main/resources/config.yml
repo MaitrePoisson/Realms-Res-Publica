@@ -369,5 +369,9 @@ guard_encircle_min: 3
 forge_ticks: 100
 # Armoury: food rations a guard takes from the warehouse once it is equipped. [0 ; 32]
 guard_rations: 4
+# Guard archers: ticks spent reloading behind the battlements between two shots (40 = 2 s). [10 ; 200]
+guard_reload_ticks: 40
+# Melee guards: total front arc (degrees) of the raised shield; projectiles from inside it are blocked. [30 ; 180]
+guard_shield_arc: 120
 # Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
 biome_overrides: ""

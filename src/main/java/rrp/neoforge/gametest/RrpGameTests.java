@@ -1472,7 +1472,7 @@ public final class RrpGameTests {
                     .with(rrp.core.SimConfig.Key.CARAVAN_INTERVAL_S, 0));
             var cfg = RrpMod.simConfig();
             rrp.neoforge.CaravanService.reset();
-            b = RrpMod.registry().create(a.worldName(), (int) a.x() + 40, (int) a.y(), (int) a.z(), 5);
+            b = RrpMod.registry().create(a.worldName(), a.x() + 40, a.y(), a.z(), 5);
             a.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
             b.setLodForced(rrp.core.abstractsim.Lod.ABSTRACT);
             RrpMod.activity().evaluate(a, 0);
@@ -2162,6 +2162,137 @@ public final class RrpGameTests {
         RrpMod.behaviors().runOnce(site, level, guard);
         h.assertTrue(creeper.isAlive(), "no strike without a weapon");
         creeper.discard();
+        h.succeed();
+    }
+
+    // ---------- military versus civilian reaction and guard postures (M73) ----------
+
+    /** Open ground for a fight: stone floor, free air, a village of two villagers (a guard and a farmer). */
+    private static VillageSite combatVillage(GameTestHelper h, Villager[] who) {
+        for (int x = 0; x <= 26; x++) {
+            for (int z = 4; z <= 20; z++) {
+                h.setBlock(new BlockPos(x, 0, z), Blocks.STONE);
+                for (int y = 1; y <= 5; y++) {
+                    h.setBlock(new BlockPos(x, y, z), Blocks.AIR);
+                }
+            }
+        }
+        VillageSite site = village(h, 2, 0, 0);
+        ServerLevel level = h.getLevel();
+        var vs = level.getEntitiesOfClass(Villager.class, h.getBounds());
+        who[0] = vs.get(0);
+        who[1] = vs.get(1);
+        for (Villager other : RrpMod.adapter().present(site, level)) {
+            if (other != who[0] && other != who[1]) {
+                RrpMod.adapter().setRole(other, Role.FARMER);
+            }
+        }
+        RrpMod.adapter().setRole(who[0], Role.GUARD);
+        RrpMod.adapter().setRole(who[1], Role.FARMER);
+        for (Villager v : who) {
+            v.setNoAi(false);
+        }
+        RrpMod.guardAi().reset();
+        return site;
+    }
+
+    private static void put(GameTestHelper h, net.minecraft.world.entity.Entity e, int x, int z) {
+        BlockPos p = h.absolutePos(new BlockPos(x, 1, z));
+        e.setPos(p.getX() + 0.5, p.getY(), p.getZ() + 0.5);
+    }
+
+    /** A monster that does not burn in the sun (a helmet), so only the guards can hurt it. */
+    private static <T extends net.minecraft.world.entity.Mob> T fireproof(T mob) {
+        mob.setItemSlot(net.minecraft.world.entity.EquipmentSlot.HEAD, new ItemStack(Items.GOLDEN_HELMET));
+        mob.setDropChance(net.minecraft.world.entity.EquipmentSlot.HEAD, 0.0F);
+        return mob;
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 400, batch = "guardai")
+    public static void guardStands(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager guard = who[0];
+        put(h, guard, 10, 12);
+        put(h, who[1], 2, 6);
+        var zombie = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(14, 1, 12)));
+        h.onEachTick(() -> h.assertTrue(!guard.getBrain().isActive(net.minecraft.world.entity.schedule.Activity.PANIC),
+                "a guard never panics"));
+        h.succeedWhen(() -> {
+            h.assertTrue(!zombie.isAlive(), "the guard stood its ground and killed the zombie");
+            h.assertTrue(guard.isAlive(), "the guard survived");
+            h.assertTrue(rrp.neoforge.tactics.CivilianReaction.stripped(guard), "the guard's fear sensors are off");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 300, batch = "guardai")
+    public static void civilianFlees(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager farmer = who[1];
+        RrpMod.adapter().setRole(who[0], Role.FARMER);
+        put(h, who[0], 2, 6);
+        put(h, farmer, 12, 12);
+        rrp.neoforge.tactics.CivilianReaction.reset();
+        var zombie = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(16, 1, 12)));
+        zombie.setNoAi(true);
+        double start = farmer.distanceTo(zombie);
+        boolean[] panicked = {false};
+        h.onEachTick(() -> panicked[0] |= farmer.getBrain().isActive(net.minecraft.world.entity.schedule.Activity.PANIC));
+        h.succeedWhen(() -> {
+            h.assertTrue(panicked[0], "the civilian panicked");
+            h.assertTrue(farmer.distanceTo(zombie) > start, "the civilian ran away (from " + start + " to " + farmer.distanceTo(zombie) + ")");
+            h.assertTrue(rrp.neoforge.tactics.CivilianReaction.rings() >= 1, "the bell was rung");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 500, batch = "guardai")
+    public static void archerShoots(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager archer = who[0];
+        put(h, who[1], 2, 6);
+        put(h, archer, 2, 12);
+        archer.setItemSlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND, new ItemStack(Items.BOW));
+        archer.getInventory().addItem(new ItemStack(Items.ARROW, 16));
+        var skeleton = fireproof(h.spawn(EntityType.SKELETON, new BlockPos(22, 1, 12)));
+        skeleton.setNoAi(true);
+        long before = RrpMod.guardAi().arrows();
+        double[] start = {archer.getX(), archer.getZ()};
+        h.succeedWhen(() -> {
+            h.assertTrue(RrpMod.guardAi().arrows() > before, "the archer loosed arrows");
+            h.assertTrue(skeleton.getHealth() < skeleton.getMaxHealth() || !skeleton.isAlive(),
+                    "an arrow hit the skeleton at 20 blocks (health " + skeleton.getHealth() + ")");
+            h.assertTrue(Math.hypot(archer.getX() - start[0], archer.getZ() - start[1]) < 3, "the archer held its position");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 100, batch = "guardai")
+    public static void shieldBlocks(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        combatVillage(h, who);
+        Villager guard = who[0];
+        put(h, guard, 12, 12);
+        guard.setYRot(0); // faces +z
+        ServerLevel level = h.getLevel();
+        var arrowFront = EntityType.ARROW.create(level);
+        arrowFront.setPos(guard.getX(), guard.getY() + 1, guard.getZ() + 8);
+        var front = level.damageSources().arrow(arrowFront, null);
+        var arrowBack = EntityType.ARROW.create(level);
+        arrowBack.setPos(guard.getX(), guard.getY() + 1, guard.getZ() - 8);
+        var back = level.damageSources().arrow(arrowBack, null);
+        float hp = guard.getHealth();
+        rrp.neoforge.tactics.GuardAi.raiseShield(guard);
+        guard.hurt(front, 4);
+        h.assertTrue(guard.getHealth() == hp, "a projectile from the front arc is stopped by the raised shield");
+        guard.invulnerableTime = 0;
+        guard.hurt(back, 4);
+        h.assertTrue(guard.getHealth() < hp, "a projectile from behind goes through");
+        float after = guard.getHealth();
+        guard.invulnerableTime = 0;
+        rrp.neoforge.tactics.GuardAi.lowerShield(guard);
+        guard.hurt(front, 2);
+        h.assertTrue(guard.getHealth() < after, "with the shield down nothing is blocked");
         h.succeed();
     }
 }
