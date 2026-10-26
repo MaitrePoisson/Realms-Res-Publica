@@ -6,6 +6,7 @@ import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.core.VillagerState;
 import rrp.neoforge.WarehouseService;
+import rrp.neoforge.logistics.ShortageBoard;
 import rrp.neoforge.urban.ExpansionPlanner;
 
 import java.util.Comparator;
@@ -32,7 +33,18 @@ public final class Steward extends RoleBehavior {
     @Override
     public boolean runOnce(BehaviorContext ctx) {
         boolean planned = planExpansion(ctx);
-        return feed(ctx) | planned;
+        boolean heard = hearShortages(ctx);
+        return feed(ctx) | planned | heard;
+    }
+
+    /** Reads the shortage flags the waiting workers raised and tells the village what is missing from the stock. */
+    private static boolean hearShortages(BehaviorContext ctx) {
+        var missing = ShortageBoard.take(ctx.site().id());
+        for (Resource r : missing) {
+            rrp.neoforge.RrpMod.crises().tell(ctx.site(),
+                    rrp.neoforge.RrpMod.lang().msg("logistics.shortage", ctx.site().id(), r.label().toLowerCase()));
+        }
+        return !missing.isEmpty();
     }
 
     /** Émet un ordre de construction si les quotas de stock et de population le permettent. */

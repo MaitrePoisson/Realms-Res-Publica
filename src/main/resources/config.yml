@@ -355,6 +355,8 @@ rummage_min_ticks: 20
 rummage_max_ticks: 40
 # Active wait: seconds between two checks of an empty chest. [1 ; 3600]
 wait_retry_s: 10
+# Civilians sheltering from a monster go back to work after this many ticks without any hostile near (100 = 5 s). [20 ; 2400]
+civilian_release_ticks: 100
 # Guards withdraw behind their comrades when their health falls to this percentage or below. [1 ; 90]
 guard_retreat_pct: 25
 # Distance (blocks) from which guard archers shoot. [8 ; 64]

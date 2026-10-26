@@ -112,6 +112,9 @@ public final class BehaviorScheduler {
         if (st == null) {
             return false;
         }
+        if (rrp.neoforge.tactics.CivilianMachine.sheltered(villager)) {
+            return false; // alerted or sheltering: no work until the guards have cleared the threat
+        }
         var logistics = rrp.neoforge.RrpMod.logistics();
         if (logistics != null && logistics.busy(villager)) {
             return false; // mid-trip to a chest: the trip owns the villager

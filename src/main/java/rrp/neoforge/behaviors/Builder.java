@@ -114,6 +114,7 @@ public final class Builder extends RoleBehavior {
         int cost = Math.min((int) ctx.config().get(SimConfig.Key.HUT_WOOD), ctx.logistics().access().capacity());
         if (ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.WOOD, 0)
                 + CarriedItems.count(ctx.villager(), Resource.WOOD) < cost) {
+            ActiveWait.hold(ctx, Resource.WOOD); // a hut is due but the chest holds too little wood
             return false;
         }
         Supply supply = ensure(ctx, Resource.WOOD, cost, cost);
@@ -177,9 +178,12 @@ public final class Builder extends RoleBehavior {
             return drop(ctx, order);
         }
         var stock = ctx.warehouse().read(site, ctx.level());
-        if (stock.getOrDefault(Resource.WOOD, 0) < order.wood() || stock.getOrDefault(Resource.STONE, 0) < order.stone()) {
+        boolean noWood = stock.getOrDefault(Resource.WOOD, 0) < order.wood();
+        if (noWood || stock.getOrDefault(Resource.STONE, 0) < order.stone()) {
+            ActiveWait.hold(ctx, noWood ? Resource.WOOD : Resource.STONE); // the order waits for the stock
             return false;
         }
+        ActiveWait.end(ctx.villager());
         var size = template.get().getSize();
         Optional<BlockPos> spot = TerrainLeveler.findSpot(ctx.level(), site, order.x(), order.z(),
                 size.getX(), size.getY(), size.getZ(), SEARCH_RING, order.y(), ctx.villager());
@@ -242,6 +246,7 @@ public final class Builder extends RoleBehavior {
         need = Math.min(need, cap);
         int have = CarriedItems.count(v, r);
         if (have >= need) {
+            ActiveWait.end(v);
             return Supply.READY;
         }
         int want = Math.max(need, Math.min(hold, cap)) - have;
@@ -254,9 +259,15 @@ public final class Builder extends RoleBehavior {
         }
         var result = access.withdraw(v, ctx.site(), ctx.level(), r, want, true);
         if (result.moved() > 0 && CarriedItems.count(v, r) >= need) {
+            ActiveWait.end(v);
             return Supply.READY;
         }
-        return result.moved() > 0 || result.tripRequested() ? Supply.FETCHING : Supply.EMPTY;
+        if (result.moved() > 0 || result.tripRequested()) {
+            ActiveWait.end(v);
+            return Supply.FETCHING;
+        }
+        ActiveWait.hold(ctx, r); // the chest holds none: complain, clear the land or sit
+        return Supply.EMPTY;
     }
 
     /**

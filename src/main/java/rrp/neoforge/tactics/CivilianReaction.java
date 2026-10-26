@@ -1,12 +1,10 @@
 package rrp.neoforge.tactics;
 
-import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
-import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.entity.ai.sensing.Sensor;
 import net.minecraft.world.entity.ai.sensing.SensorType;
 import net.minecraft.world.entity.monster.Creeper;
@@ -67,10 +65,12 @@ public final class CivilianReaction {
             return;
         }
         var state = RrpMod.adapter().stateOf(v);
-        if (state == null) {
+        boolean child = v.isBaby();
+        if (state == null && !child) {
             return;
         }
-        if (state.role() == Role.GUARD) {
+        if (state != null && state.role() == Role.GUARD && !child) {
+            CivilianMachine.forget(v);
             soldier(v);
         } else {
             restore(v);
@@ -152,16 +152,10 @@ public final class CivilianReaction {
             }
         }
         boolean alarmed = brain.hasMemoryValue(MemoryModuleType.NEAREST_HOSTILE) || brain.isActive(Activity.PANIC);
-        if (!alarmed) {
-            return;
-        }
-        ringBell(v, level);
-        if (brain.isActive(Activity.PANIC) && v.tickCount % 20 == 0) {
-            shelter(v, level);
-        }
+        CivilianMachine.tick(v, level, alarmed); // alert, bell, shelter, wait for the guards, release
     }
 
-    private static void ringBell(Villager v, ServerLevel level) {
+    static void ringBell(Villager v, ServerLevel level) {
         var site = RrpMod.registry().find(Worlds.name(level), v.getX(), v.getZ());
         String key = site == null ? Worlds.name(level) : site.id();
         long now = level.getGameTime();
@@ -172,18 +166,5 @@ public final class CivilianReaction {
         LAST_RING.put(key, now);
         rings++;
         level.playSound(null, v.blockPosition(), SoundEvents.BELL_BLOCK, SoundSource.BLOCKS, 4.0F, 1.0F);
-    }
-
-    /** Heads for the bed (or house) unless the hostile is right on the villager: then it just runs. */
-    private static void shelter(Villager v, ServerLevel level) {
-        Brain<Villager> brain = v.getBrain();
-        var hostile = brain.getMemory(MemoryModuleType.NEAREST_HOSTILE).orElse(null);
-        if (hostile != null && hostile.distanceToSqr(v) < RUN_RANGE * RUN_RANGE) {
-            return;
-        }
-        GlobalPos home = brain.getMemory(MemoryModuleType.HOME).orElse(null);
-        if (home != null && home.dimension().equals(level.dimension())) {
-            brain.setMemory(MemoryModuleType.WALK_TARGET, new WalkTarget(home.pos(), 0.7F, 1));
-        }
     }
 }

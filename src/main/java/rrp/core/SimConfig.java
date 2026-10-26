@@ -203,7 +203,8 @@ public final class SimConfig {
         GUARD_SHIELD_ARC(120, 30, 180),
         GUARD_CREEPER_CLOSE(6, 2, 12),
         GUARD_CREEPER_REDUCTION(60, 0, 100),
-        GUARD_HEAL_AMOUNT(6, 1, 20);
+        GUARD_HEAL_AMOUNT(6, 1, 20),
+        CIVILIAN_RELEASE_TICKS(100, 20, 2400);
 
         private final double def;
         private final double min;

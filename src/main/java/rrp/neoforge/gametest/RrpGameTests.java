@@ -2435,4 +2435,94 @@ public final class RrpGameTests {
             h.assertTrue(wounded.isAlive() && wounded.getHealth() > 4, "its health is back (" + wounded.getHealth() + ")");
         });
     }
+
+    // ---------- civilian state machine and active waiting (M75) ----------
+
+    @GameTest(template = ARENA, timeoutTicks = 900, batch = "m75cycle")
+    public static void civilianCycle(GameTestHelper h) {
+        Villager[] who = new Villager[2];
+        VillageSite site = combatVillage(h, who);
+        Villager guard = who[0];
+        Villager farmer = who[1];
+        put(h, guard, 10, 12);
+        put(h, farmer, 2, 6);
+        rrp.neoforge.tactics.CivilianMachine.reset();
+        rrp.neoforge.tactics.CivilianReaction.reset();
+        var zombie = fireproof(h.spawn(EntityType.ZOMBIE, new BlockPos(14, 1, 12)));
+        boolean[] sheltered = {false};
+        boolean[] worked = {false};
+        boolean[] early = {false};
+        h.onEachTick(() -> {
+            if (!zombie.isAlive()) {
+                return;
+            }
+            if (rrp.neoforge.tactics.CivilianMachine.sheltered(farmer)) {
+                sheltered[0] = true;
+                worked[0] |= RrpMod.behaviors().work(site, h.getLevel(), farmer); // a sheltered civilian does not work
+            } else if (sheltered[0]) {
+                early[0] = true; // released while the threat still lives
+            }
+        });
+        h.succeedWhen(() -> {
+            h.assertTrue(!zombie.isAlive(), "the guard cleared the threat");
+            h.assertTrue(sheltered[0] && rrp.neoforge.tactics.CivilianMachine.alerts() >= 1, "the civilian was alerted and sheltered");
+            h.assertTrue(!worked[0], "no work while sheltered");
+            h.assertTrue(!early[0], "never released before the guards cleared the threat");
+            h.assertTrue(rrp.neoforge.tactics.CivilianMachine.releases() >= 1
+                    && rrp.neoforge.tactics.CivilianMachine.phase(farmer) == rrp.core.tactics.CivilianCycle.Phase.CALM,
+                    "released back to work once the village is safe (phase " + rrp.neoforge.tactics.CivilianMachine.phase(farmer) + ")");
+            h.assertTrue(farmer.isAlive(), "the civilian survived");
+        });
+    }
+
+    @GameTest(template = ARENA, timeoutTicks = 100, batch = "m75wait")
+    public static void emptyChestWait(GameTestHelper h) {
+        try {
+            emptyChestWaitBody(h);
+        } finally {
+            wipeTown(h);
+        }
+    }
+
+    private static void emptyChestWaitBody(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        BlockPos hall = h.absolutePos(new BlockPos(18, 1, 18));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        List<Villager> vs = level.getEntitiesOfClass(Villager.class, h.getBounds());
+        Villager builder = vs.get(0);
+        Villager steward = vs.get(1);
+        RrpMod.adapter().setRole(builder, Role.BUILDER);
+        RrpMod.adapter().setRole(steward, Role.STEWARD);
+        rrp.neoforge.behaviors.ActiveWait.reset();
+        rrp.neoforge.logistics.ShortageBoard.reset();
+        BlockPos at = h.absolutePos(new BlockPos(8, 1, 6));
+        site.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.HOUSE, at.getX(), at.getY(), at.getZ()));
+        // 1. the chest is empty: the builder complains to the steward and raises the shortage flag
+        h.assertTrue(!RrpMod.behaviors().runOnce(site, level, builder), "no start without wood");
+        h.assertTrue(rrp.neoforge.behaviors.ActiveWait.waiting(builder) && rrp.neoforge.behaviors.ActiveWait.complaints() == 1,
+                "the builder complained once");
+        h.assertTrue(rrp.neoforge.logistics.ShortageBoard.flagged(site.id(), Resource.WOOD), "the shortage flag is raised");
+        // 2. it helps clearing the land
+        BlockPos fern = builder.blockPosition().offset(2, 0, 0);
+        level.setBlock(fern, Blocks.FERN.defaultBlockState(), 3);
+        RrpMod.behaviors().runOnce(site, level, builder);
+        h.assertTrue(level.getBlockState(fern).isAir() && rrp.neoforge.behaviors.ActiveWait.cleared() == 1, "it cleared the fern nearby");
+        h.assertTrue(rrp.neoforge.behaviors.ActiveWait.complaints() == 1, "it does not complain twice");
+        // 3. nothing left to clear: it sits
+        RrpMod.behaviors().runOnce(site, level, builder);
+        h.assertTrue(rrp.neoforge.behaviors.ActiveWait.sitting(builder) && builder.isShiftKeyDown(), "it sits down");
+        // 4. the steward reads the flag
+        RrpMod.behaviors().runOnce(site, level, steward);
+        h.assertTrue(!rrp.neoforge.logistics.ShortageBoard.flagged(site.id(), Resource.WOOD)
+                && rrp.neoforge.logistics.ShortageBoard.read() == 1, "the steward read the shortage");
+        // 5. the chest is refilled: the wait ends and the work starts
+        WarehouseService.barrel(site, level).setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        RrpMod.warehouse().refresh(site, level);
+        RrpMod.behaviors().runOnce(site, level, builder);
+        h.assertTrue(!rrp.neoforge.behaviors.ActiveWait.waiting(builder) && !builder.isShiftKeyDown(), "the wait is over");
+        h.assertTrue(site.construction() != null, "the builder started the site");
+        h.succeed();
+    }
 }
