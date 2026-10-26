@@ -78,6 +78,27 @@ public final class CarriedItems {
         return moved;
     }
 
+    /** Removes up to {@code n} carried units of {@code r} (consumed by a job); returns how many were removed. */
+    public static int take(Villager v, Resource r, int n) {
+        int left = n;
+        SimpleContainer inv = v.getInventory();
+        for (int i = 0; i < inv.getContainerSize() && left > 0; i++) {
+            ItemStack slot = inv.getItem(i);
+            if (WarehouseService.classify(slot) != r) {
+                continue;
+            }
+            int k = Math.min(left, slot.getCount());
+            slot.shrink(k);
+            if (slot.isEmpty()) {
+                inv.setItem(i, ItemStack.EMPTY);
+            }
+            left -= k;
+        }
+        inv.setChanged();
+        showInHand(v);
+        return n - left;
+    }
+
     /** Shows the biggest carried stack in the main hand, or clears the hand when nothing counted is carried. */
     public static void showInHand(Villager v) {
         ItemStack hand = v.getItemBySlot(EquipmentSlot.MAINHAND);

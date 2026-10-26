@@ -10,6 +10,7 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructurePlaceSettings;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate;
 import net.minecraft.world.phys.AABB;
+import rrp.core.logistics.CostShare;
 
 /**
  * Chantier en cours : un plan posé à {@code origin}, nivellement d'abord (une rangée de l'emprise élargie par pas),
@@ -22,16 +23,55 @@ public final class ConstructionSite {
     private final BuildType type;
     private final BlockPos origin;
     private int step;
+    private final int woodCost;
+    private final int stoneCost;
 
+    /** Materials of a step: what the builder carries (it must go and fetch more when {@link #has} says no) and how they are used up. */
+    public interface Supply {
+        boolean has(int wood, int stone);
+
+        void spend(int wood, int stone);
+    }
+
+    /** A site whose materials are already paid (free of charge). */
     public ConstructionSite(BuildType type, BlockPos origin, int step) {
+        this(type, origin, step, 0, 0);
+    }
+
+    /** A site that costs {@code woodCost} / {@code stoneCost} in total, consumed step after step as the plan goes up. */
+    public ConstructionSite(BuildType type, BlockPos origin, int step, int woodCost, int stoneCost) {
         this.type = type;
         this.origin = origin;
         this.step = step;
+        this.woodCost = woodCost;
+        this.stoneCost = stoneCost;
     }
 
     public BuildType type() { return type; }
     public BlockPos origin() { return origin; }
     public int step() { return step; }
+    public int woodCost() { return woodCost; }
+    public int stoneCost() { return stoneCost; }
+
+    /** Wood the next step consumes. */
+    public int woodForStep(StructureTemplate t) {
+        return CostShare.ofStep(woodCost, totalSteps(t), step);
+    }
+
+    /** Stone the next step consumes. */
+    public int stoneForStep(StructureTemplate t) {
+        return CostShare.ofStep(stoneCost, totalSteps(t), step);
+    }
+
+    /** Wood still to be consumed by the steps left. */
+    public int woodLeft(StructureTemplate t) {
+        return woodCost - CostShare.due(woodCost, totalSteps(t), step);
+    }
+
+    /** Stone still to be consumed by the steps left. */
+    public int stoneLeft(StructureTemplate t) {
+        return stoneCost - CostShare.due(stoneCost, totalSteps(t), step);
+    }
 
     /** Nombre total de pas pour un plan de cette taille. */
     public static int totalSteps(StructureTemplate t) {
@@ -53,15 +93,22 @@ public final class ConstructionSite {
 
     /**
      * Fait avancer le chantier d'au plus {@code budget} pas. Un pas bloqué par un être vivant (autre que le bâtisseur)
-     * n'avance pas : il sera retenté. Renvoie le nombre de pas réalisés.
+     * n'avance pas : il sera retenté. Un pas dont {@code supply} n'a pas les matériaux n'avance pas non plus : le bâtisseur
+     * s'arrête (il doit aller en chercher). Renvoie le nombre de pas réalisés.
      */
-    public int advance(ServerLevel level, StructureTemplate t, Entity builder, int budget) {
+    public int advance(ServerLevel level, StructureTemplate t, Entity builder, int budget, Supply supply) {
         int made = 0;
         while (made < budget && !done(t)) {
+            int wood = woodForStep(t);
+            int stone = stoneForStep(t);
+            if (!supply.has(wood, stone)) {
+                break;
+            }
             boolean ok = step < levelSteps(t) ? levelStep(level, t, builder) : placeStep(level, t, builder);
             if (!ok) {
                 break;
             }
+            supply.spend(wood, stone);
             step++;
             made++;
         }

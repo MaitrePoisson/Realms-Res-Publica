@@ -3,6 +3,8 @@ package rrp.neoforge.behaviors;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.level.block.BedBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -13,6 +15,7 @@ import rrp.core.Role;
 import rrp.core.SimConfig;
 import rrp.neoforge.TownHall;
 import rrp.neoforge.Worlds;
+import rrp.neoforge.logistics.CarriedItems;
 import rrp.neoforge.urban.BlueprintPool;
 import rrp.neoforge.urban.BuildOrder;
 import rrp.neoforge.urban.ConstructionSite;
@@ -21,13 +24,20 @@ import rrp.neoforge.urban.DefensePlanner;
 import rrp.neoforge.urban.RoadNetwork;
 import rrp.neoforge.urban.TerrainLeveler;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Mène les chantiers du village : prend l'ordre de l'intendant, choisit et nivelle un emplacement dans les
  * frontières, puis pose le plan rangée par rangée sur plusieurs actions, avec les matériaux du stock communautaire.
  * Sans ordre, il consomme du bois de l'entrepôt pour bâtir une petite hutte (4×3, murs de 2 blocs, toit, porte ouverte
  * à l'ouest) contenant un vrai lit. Il ne bâtit que s'il manque des lits au village.
+ * <p>
+ * Les matériaux ne quittent jamais l'entrepôt à distance : le bâtisseur les <b>porte</b> (au plus {@code carry_capacity}
+ * unités), chaque pas de chantier en consomme une part proportionnelle au coût du plan, et à court il s'arrête, retourne
+ * au tonneau, charge puis revient au chantier. Seul le coût total et le numéro de pas sont gardés dans le chantier.
  */
 public final class Builder extends RoleBehavior {
 
@@ -42,6 +52,23 @@ public final class Builder extends RoleBehavior {
     static final int SEARCH_RING = 14;
     /** Nombre maximal de routes par village. */
     static final int MAX_ROADS = 24;
+    /** Distance horizontale (blocs) à laquelle le bâtisseur doit se trouver du chantier pour le faire avancer. */
+    static final double SITE_REACH = 12;
+    /** Actions passées à rejoindre le chantier avant de renoncer à marcher (chemin impossible) et de bâtir à distance. */
+    static final int MAX_APPROACH = 12;
+
+    /** Where the builder stands in the supply chain of a job. */
+    enum Supply {
+        /** The needed units are in the builder's hands. */
+        READY,
+        /** A load was just taken or a trip to the warehouse is on: the action is used up. */
+        FETCHING,
+        /** Nothing to fetch: the stock is empty (the builder waits). */
+        EMPTY
+    }
+
+    /** Actions each builder has spent walking to its site (transient: a restart just starts counting again). */
+    private static final Map<UUID, Integer> APPROACH = new HashMap<>();
 
     @Override
     public Role role() {
@@ -50,6 +77,16 @@ public final class Builder extends RoleBehavior {
 
     @Override
     public boolean runOnce(BehaviorContext ctx) {
+        boolean did = work(ctx);
+        // nothing left to build: the leftover materials go back to the barrel
+        if (!did && ctx.site().construction() == null && ctx.site().orders().isEmpty()
+                && CarriedItems.total(ctx.villager()) > 0) {
+            return unload(ctx);
+        }
+        return did;
+    }
+
+    private boolean work(BehaviorContext ctx) {
         if (!ctx.site().hasHall()) {
             return buildTownHall(ctx);
         }
@@ -73,17 +110,21 @@ public final class Builder extends RoleBehavior {
                 >= ctx.site().state().population() + (int) ctx.config().get(SimConfig.Key.BUILDER_SPARE_BEDS)) {
             return workOnBorders(ctx);
         }
-        int cost = (int) ctx.config().get(SimConfig.Key.HUT_WOOD);
-        if (ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.WOOD, 0) < cost) {
+        // the whole hut is paid from one load: a hut dearer than the arms can carry costs a full load
+        int cost = Math.min((int) ctx.config().get(SimConfig.Key.HUT_WOOD), ctx.logistics().access().capacity());
+        if (ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.WOOD, 0)
+                + CarriedItems.count(ctx.villager(), Resource.WOOD) < cost) {
             return false;
+        }
+        Supply supply = ensure(ctx, Resource.WOOD, cost, cost);
+        if (supply != Supply.READY) {
+            return supply == Supply.FETCHING;
         }
         BlockPos origin = findSpot(ctx);
         if (origin == null) {
             return false;
         }
-        if (ctx.warehouse().withdraw(ctx.site(), ctx.level(), Resource.WOOD, cost) < cost) {
-            return false;
-        }
+        CarriedItems.take(ctx.villager(), Resource.WOOD, cost);
         walkToward(ctx, origin);
         build(ctx.level(), origin);
         ctx.site().state().setBeds(ctx.site().state().beds() + 1);
@@ -108,11 +149,17 @@ public final class Builder extends RoleBehavior {
             ctx.registry().markDirty();
             return started;
         }
-        walkToward(ctx, cs.origin());
-        int made = cs.advance(ctx.level(), template.get(), ctx.villager(), STEPS_PER_ACTION);
+        if (!reachSite(ctx, cs)) {
+            return true; // on its way to the site
+        }
+        int made = cs.advance(ctx.level(), template.get(), ctx.villager(), STEPS_PER_ACTION, supplyOf(ctx));
         if (cs.done(template.get())) {
             finish(ctx, cs, template.get());
             return true;
+        }
+        if (made < STEPS_PER_ACTION && fetchFor(ctx, cs, template.get())) {
+            ctx.registry().markDirty();
+            return true; // short of materials: off to the warehouse
         }
         if (made > 0 || started) {
             ctx.registry().markDirty();
@@ -139,12 +186,98 @@ public final class Builder extends RoleBehavior {
         if (spot.isEmpty()) {
             return drop(ctx, order);
         }
-        // le stock vient d'être vérifié : on retire les deux matériaux d'un coup
-        ctx.warehouse().withdraw(site, ctx.level(), Resource.WOOD, order.wood());
-        ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, order.stone());
-        site.setConstruction(new ConstructionSite(order.type(), spot.get(), 0));
+        // nothing leaves the warehouse here: the builder fetches the materials step after step, on foot
+        site.setConstruction(new ConstructionSite(order.type(), spot.get(), 0, order.wood(), order.stone()));
         ctx.registry().markDirty();
         return true;
+    }
+
+    /** What the builder carries pays the steps of the plan: checked before a step, used up once it is done. */
+    private static ConstructionSite.Supply supplyOf(BehaviorContext ctx) {
+        return new ConstructionSite.Supply() {
+            @Override
+            public boolean has(int wood, int stone) {
+                return CarriedItems.count(ctx.villager(), Resource.WOOD) >= wood
+                        && CarriedItems.count(ctx.villager(), Resource.STONE) >= stone;
+            }
+
+            @Override
+            public void spend(int wood, int stone) {
+                CarriedItems.take(ctx.villager(), Resource.WOOD, wood);
+                CarriedItems.take(ctx.villager(), Resource.STONE, stone);
+            }
+        };
+    }
+
+    /**
+     * The builder is out of what the next step needs: goes to the warehouse for the missing material (the share of its
+     * arms that the rest of the plan needs of it). True if it set off or loaded something, false if it lacks nothing
+     * (the step is blocked by something else) or the stock is empty.
+     */
+    private static boolean fetchFor(BehaviorContext ctx, ConstructionSite cs, net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate t) {
+        var v = ctx.villager();
+        int needWood = cs.woodForStep(t);
+        int needStone = cs.stoneForStep(t);
+        boolean wood = CarriedItems.count(v, Resource.WOOD) < needWood;
+        if (!wood && CarriedItems.count(v, Resource.STONE) >= needStone) {
+            return false;
+        }
+        int leftWood = cs.woodLeft(t);
+        int leftStone = cs.stoneLeft(t);
+        int left = wood ? leftWood : leftStone;
+        int cap = ctx.logistics().access().capacity();
+        int hold = Math.min(left, Math.max(1, (int) ((long) cap * left / Math.max(1, leftWood + leftStone))));
+        return ensure(ctx, wood ? Resource.WOOD : Resource.STONE, wood ? needWood : needStone, hold) == Supply.FETCHING;
+    }
+
+    /**
+     * Gets {@code need} units of {@code r} into the builder's arms, up to {@code hold} units when it loads. Takes them
+     * at once when the builder stands within reach of the barrel, otherwise sets off to it (the load is taken when it
+     * arrives). If its arms are full of something else it first puts that back.
+     */
+    static Supply ensure(BehaviorContext ctx, Resource r, int need, int hold) {
+        var v = ctx.villager();
+        var access = ctx.logistics().access();
+        int cap = access.capacity();
+        need = Math.min(need, cap);
+        int have = CarriedItems.count(v, r);
+        if (have >= need) {
+            return Supply.READY;
+        }
+        int want = Math.max(need, Math.min(hold, cap)) - have;
+        int free = CarriedItems.free(v, cap);
+        if (free < want) {
+            want = free;
+            if (have + want < need) {
+                return unload(ctx) ? Supply.FETCHING : Supply.EMPTY;
+            }
+        }
+        var result = access.withdraw(v, ctx.site(), ctx.level(), r, want, true);
+        if (result.moved() > 0 && CarriedItems.count(v, r) >= need) {
+            return Supply.READY;
+        }
+        return result.moved() > 0 || result.tripRequested() ? Supply.FETCHING : Supply.EMPTY;
+    }
+
+    /**
+     * True once the builder stands at the site (or has no AI to walk with); otherwise heads there. After
+     * {@link #MAX_APPROACH} actions without arriving it gives up walking and builds from where it is.
+     */
+    private boolean reachSite(BehaviorContext ctx, ConstructionSite cs) {
+        var v = ctx.villager();
+        double dx = v.getX() - (cs.origin().getX() + 0.5);
+        double dz = v.getZ() - (cs.origin().getZ() + 0.5);
+        if (v.isNoAi() || dx * dx + dz * dz <= SITE_REACH * SITE_REACH && Math.abs(v.getY() - cs.origin().getY()) <= 8) {
+            APPROACH.remove(v.getUUID());
+            return true;
+        }
+        if (APPROACH.merge(v.getUUID(), 1, Integer::sum) > MAX_APPROACH) {
+            APPROACH.remove(v.getUUID());
+            return true;
+        }
+        v.getBrain().setMemory(MemoryModuleType.WALK_TARGET, new WalkTarget(cs.origin(), 0.6f, 3));
+        v.getNavigation().moveTo(cs.origin().getX() + 0.5, cs.origin().getY(), cs.origin().getZ() + 0.5, 0.6);
+        return false;
     }
 
     /** Ordre irréalisable (plan absent, aucun emplacement) : on l'abandonne, l'intendant en émettra un autre. */
@@ -214,12 +347,19 @@ public final class Builder extends RoleBehavior {
                 ctx.registry().markDirty();
                 return true;
             }
-            if (!road.pavedDone() && canPave(ctx)) {
+            // paving that has begun goes on: what the other builders carry away must not stop it halfway
+            if (!road.pavedDone() && (road.paved() > 0 || canPave(ctx))) {
                 int batch = Math.min(RoadNetwork.TILES_PER_STEP, road.length() - road.paved());
                 int cost = (batch + 1) / 2;
-                if (ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, cost) < cost) {
+                int hold = Math.min(ctx.logistics().access().capacity(), (road.length() - road.paved() + 1) / 2);
+                Supply supply = ensure(ctx, Resource.STONE, cost, hold);
+                    if (supply == Supply.EMPTY) {
                     continue;
                 }
+                if (supply == Supply.FETCHING) {
+                    return true;
+                }
+                CarriedItems.take(ctx.villager(), Resource.STONE, cost);
                 RoadNetwork.pave(ctx.level(), road, batch, ground);
                 ctx.registry().markDirty();
                 return true;
@@ -264,16 +404,19 @@ public final class Builder extends RoleBehavior {
         if (!d.palisadeDone()) {
             int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.laid());
             int cost = (n + 2) / 3;
-            if (ctx.warehouse().withdraw(site, ctx.level(), Resource.WOOD, cost) < cost) {
-                return false;
+            Supply supply = ensure(ctx, Resource.WOOD, cost, ctx.logistics().access().capacity());
+            if (supply != Supply.READY) {
+                return supply == Supply.FETCHING;
             }
+            CarriedItems.take(ctx.villager(), Resource.WOOD, cost);
             int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.laid());
             walkToward(ctx, new BlockPos(c[0], hall[1], c[1]));
             d.advanceLaid(DefensePlanner.work(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.laid(), n, false));
             ctx.registry().markDirty();
             return true;
         }
-        int stone = ctx.warehouse().read(site, ctx.level()).getOrDefault(Resource.STONE, 0);
+        int stone = ctx.warehouse().read(site, ctx.level()).getOrDefault(Resource.STONE, 0)
+                + inTransit(ctx, Resource.STONE);
         if (DefensePlan.shouldUpgrade(d, stone, site.state().population(), rules)) {
             d.startUpgrade();
             ctx.registry().markDirty();
@@ -281,9 +424,11 @@ public final class Builder extends RoleBehavior {
         if (d.stage() == rrp.neoforge.urban.Defense.STONE && !d.stoneDone()) {
             int n = Math.min(DefensePlan.COLUMNS_PER_STEP, d.length() - d.upgraded());
             int cost = (n + 1) / 2;
-            if (ctx.warehouse().withdraw(site, ctx.level(), Resource.STONE, cost) < cost) {
-                return false;
+            Supply supply = ensure(ctx, Resource.STONE, cost, ctx.logistics().access().capacity());
+            if (supply != Supply.READY) {
+                return supply == Supply.FETCHING;
             }
+            CarriedItems.take(ctx.villager(), Resource.STONE, cost);
             int[] c = DefensePlan.ringAt(hall[0], hall[2], d.radius(), d.upgraded());
             walkToward(ctx, new BlockPos(c[0], hall[1], c[1]));
             d.advanceUpgraded(DefensePlanner.work(ctx.level(), d, hall[0], hall[2], hall[1], paths, d.upgraded(), n, true));
@@ -305,9 +450,21 @@ public final class Builder extends RoleBehavior {
         return rrp.neoforge.TerritoryService.placePost(ctx.level(), p[0], p[1], site.id());
     }
 
+    /** What the village's villagers carry of {@code r}: still the village's, even if it left the barrel. */
+    private static int inTransit(BehaviorContext ctx, Resource r) {
+        int n = CarriedItems.count(ctx.villager(), r);
+        for (var v : rrp.neoforge.RrpMod.adapter().present(ctx.site(), ctx.level())) {
+            if (v != ctx.villager()) {
+                n += CarriedItems.count(v, r);
+            }
+        }
+        return n;
+    }
+
     private static boolean canPave(BehaviorContext ctx) {
         return ctx.site().state().population() >= (int) ctx.config().get(SimConfig.Key.ROAD_PAVE_POPULATION)
                 && ctx.warehouse().read(ctx.site(), ctx.level()).getOrDefault(Resource.STONE, 0)
+                + inTransit(ctx, Resource.STONE)
                 >= (int) ctx.config().get(SimConfig.Key.ROAD_PAVE_STONE_STOCK);
     }
 

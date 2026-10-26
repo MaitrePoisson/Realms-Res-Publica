@@ -363,6 +363,8 @@ public final class Persistence {
             co.addProperty("y", s.construction().origin().getY());
             co.addProperty("z", s.construction().origin().getZ());
             co.addProperty("step", s.construction().step());
+            co.addProperty("wood", s.construction().woodCost());
+            co.addProperty("stone", s.construction().stoneCost());
             o.add("construction", co);
         }
         if (!s.roads().isEmpty()) {
@@ -487,7 +489,8 @@ public final class Persistence {
             JsonObject co = o.getAsJsonObject("construction");
             s.setConstruction(new rrp.neoforge.urban.ConstructionSite(BuildType.valueOf(co.get("type").getAsString()),
                     new net.minecraft.core.BlockPos(co.get("x").getAsInt(), co.get("y").getAsInt(), co.get("z").getAsInt()),
-                    co.get("step").getAsInt()));
+                    co.get("step").getAsInt(), co.has("wood") ? co.get("wood").getAsInt() : 0,
+                    co.has("stone") ? co.get("stone").getAsInt() : 0));
         }
         if (o.has("roads")) {
             for (JsonElement e : o.getAsJsonArray("roads")) {

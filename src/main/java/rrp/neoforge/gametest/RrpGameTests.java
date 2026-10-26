@@ -145,6 +145,16 @@ public final class RrpGameTests {
         return did;
     }
 
+    /** Like {@link #act}, but a villager that sets off to the barrel is walked there and its trip finished. */
+    private static boolean actSettled(GameTestHelper h, VillageSite site) {
+        boolean did = false;
+        for (Villager v : h.getLevel().getEntitiesOfClass(Villager.class, h.getBounds())) {
+            did |= RrpMod.behaviors().runOnce(site, h.getLevel(), v);
+            settleTrip(v, WarehouseService.barrel(site, h.getLevel()).getBlockPos());
+        }
+        return did;
+    }
+
     // ---------- tests ----------
 
     @GameTest(template = ARENA)
@@ -361,7 +371,9 @@ public final class RrpGameTests {
         h.assertTrue(act(h, site), "builder did not start");
         var cs = site.construction();
         h.assertTrue(cs != null, "construction registered");
-        h.assertTrue(site.state().stock(Resource.WOOD) < woodBefore, "materials consumed from the store");
+        // opening the site pays nothing: at most one load (what the builder carries) has left the barrel
+        int cap = RrpMod.logistics().access().capacity();
+        h.assertTrue(woodBefore - inStock(site, level, Resource.WOOD) <= cap, "only one load leaves the store when the site opens");
         // it takes several actions, and a reload in the middle resumes the same site
         h.assertTrue(site.construction() != null, "still under construction after the first action");
         BlockPos origin = cs.origin();
@@ -374,8 +386,12 @@ public final class RrpGameTests {
         while (again.construction() != null && guard++ < 80) {
             for (Villager v : RrpMod.adapter().present(again, level)) {
                 RrpMod.behaviors().runOnce(again, level, v);
+                settleTrip(v, WarehouseService.barrel(again, level).getBlockPos());
             }
         }
+        int held = RrpMod.adapter().present(again, level).stream().mapToInt(x -> carried(x, Resource.WOOD)).sum();
+        h.assertTrue(woodBefore - inStock(again, level, Resource.WOOD) - held == rrp.neoforge.urban.BuildType.HOUSE.wood(),
+                "the house cost reached the site only through the builders' trips");
         h.assertTrue(again.construction() == null, "construction finished");
         h.assertTrue(guard > 1, "construction took several actions");
         h.assertTrue(again.orders().isEmpty(), "order completed");
@@ -441,6 +457,7 @@ public final class RrpGameTests {
         var builder = RrpMod.adapter().present(site, level).get(0);
         while (!d.palisadeDone() && guard++ < 60) {
             RrpMod.behaviors().runOnce(site, level, builder);
+            settleTrip(builder, WarehouseService.barrel(site, level).getBlockPos());
         }
         h.assertTrue(d.palisadeDone(), "palisade not finished");
         int cx = hall.getX();
@@ -460,7 +477,7 @@ public final class RrpGameTests {
         // upgrade to stone once the stone stock and the population allow it
         guard = 0;
         while (!d.stoneDone() && guard++ < 80) {
-            act(h, site);
+            actSettled(h, site);
         }
         h.assertTrue(d.stage() == rrp.neoforge.urban.Defense.STONE && d.stoneDone(), "stone upgrade not finished");
         for (int i = 0; i < d.length(); i++) {
@@ -668,10 +685,11 @@ public final class RrpGameTests {
         VillageSite again = RrpMod.registry().all().stream().findFirst().orElseThrow();
         h.assertTrue(again.roads().size() == 1 && again.roads().get(0).length() == road.length()
                 && again.roads().get(0).laid() == road.laid(), "road persisted");
+        RrpMod.adapter().sync(again, level); // the reloaded village knows its villagers again, as after the next gauge tick
         var r = again.roads().get(0);
         int guard = 0;
         while (!r.laidDone() && guard++ < 60) {
-            act(h, again);
+            actSettled(h, again);
         }
         h.assertTrue(r.laidDone(), "road laid");
         int[] p = r.path();
@@ -701,7 +719,7 @@ public final class RrpGameTests {
         // upgrade: enough stone and population -> paved
         guard = 0;
         while (!r.pavedDone() && guard++ < 60) {
-            act(h, again);
+            actSettled(h, again);
         }
         h.assertTrue(r.pavedDone(), "road paved");
         h.assertTrue(rrp.neoforge.urban.RoadNetwork.allPaved(level, r, hall.getY() - 1), "every tile is stone");
@@ -954,7 +972,9 @@ public final class RrpGameTests {
             int y = h.absolutePos(new BlockPos(0, 1, 0)).getY();
             int ax = (int) Math.floor(a.x());
             int az = (int) Math.floor(a.z());
-            for (BlockPos p : BlockPos.betweenClosed(h.absolutePos(new BlockPos(0, -2, 0)), h.absolutePos(new BlockPos(20, 8, 20)))) {
+            // around the village centre, which a neighbouring arena's villager can pull out of this arena
+            int groundY = h.absolutePos(new BlockPos(0, 0, 0)).getY();
+            for (BlockPos p : BlockPos.betweenClosed(new BlockPos(ax - 14, groundY - 2, az - 14), new BlockPos(ax + 14, groundY + 8, az + 14))) {
                 if (level.getBlockState(p).is(Blocks.STONE)) {
                     level.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
                 }
@@ -1792,6 +1812,115 @@ public final class RrpGameTests {
                     "villager walks to the barrel and takes the logs (phase " + trip.phase() + ", moved " + trip.moved()
                     + ", distance " + rrp.neoforge.logistics.ChestAccess.distance(v, barrel) + ")");
         });
+    }
+
+    /** Lets a villager on a trip reach the barrel and finish it (the sync tests drive the walk by hand). */
+    private static void settleTrip(Villager v, BlockPos barrel) {
+        for (int i = 0; i < 400 && RrpMod.logistics().busy(v); i++) {
+            if (i % 20 == 0) {
+                stand(v, barrel, true);
+            }
+            RrpMod.logistics().onTicks(1);
+        }
+    }
+
+    // ---------- the builder fetches its materials on foot (M71) ----------
+
+    @GameTest(template = ARENA, timeoutTicks = 600, batch = "builderfoot")
+    public static void builderfoot(GameTestHelper h) {
+        try {
+            builderfootBody(h);
+        } finally {
+            wipeTown(h);
+            // the builder was walked out of the arena: left alone it would pull the next village's centre towards here
+            if (footBuilder != null) {
+                footBuilder.discard();
+                footBuilder = null;
+            }
+            // the house stands partly outside the arena: pull it down, a neighbouring siege test could aim at its walls
+            if (footSite != null) {
+                for (BlockPos p : BlockPos.betweenClosed(footSite.offset(-2, 1, -2), footSite.offset(12, 8, 12))) {
+                    h.getLevel().setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+                }
+                footSite = null;
+            }
+            for (BlockPos p : BlockPos.betweenClosed(h.absolutePos(new BlockPos(0, 1, 0)), h.absolutePos(new BlockPos(20, 8, 20)))) {
+                h.getLevel().setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+            }
+        }
+    }
+
+    /** The builderfoot villager, which leaves the arena bounds. */
+    private static Villager footBuilder;
+    /** Where the builderfoot house goes up. */
+    private static BlockPos footSite;
+
+    /** Stands the villager at the site being built (the sync tests have no ticks to walk with). */
+    private static void toSite(Villager v, VillageSite site) {
+        if (site.construction() != null) {
+            BlockPos o = site.construction().origin();
+            footBuilder = v;
+            footSite = o;
+            v.setPos(o.getX() - 3.5, o.getY() + 1, o.getZ() + 2.5);
+        }
+    }
+
+    private static void builderfootBody(GameTestHelper h) {
+        VillageSite site = village(h, 2, 2, 0);
+        ServerLevel level = h.getLevel();
+        var logi = RrpMod.logistics();
+        level.getEntitiesOfClass(Villager.class, h.getBounds()).stream().skip(1).forEach(Villager::discard);
+        Villager v = mine(h);
+        v.setNoAi(false); // a builder with AI has to walk to its site
+        BlockPos hall = h.absolutePos(new BlockPos(4, 1, 12));
+        TownHall.build(level, hall);
+        site.setHall(hall.getX(), hall.getY(), hall.getZ());
+        // the barrel in one corner, the site in the opposite one
+        h.setBlock(new BlockPos(14, 1, 14), Blocks.AIR);
+        h.setBlock(new BlockPos(1, 1, 1), Blocks.BARREL);
+        BlockPos barrel = h.absolutePos(new BlockPos(1, 1, 1));
+        RrpMod.warehouse().set(site, level, barrel);
+        barrelAt(h, barrel).setItem(0, new ItemStack(Items.OAK_LOG, 64));
+        RrpMod.warehouse().refresh(site, level);
+        BlockPos at = h.absolutePos(new BlockPos(18, 1, 18));
+        site.orders().add(rrp.neoforge.urban.BuildOrder.of(rrp.neoforge.urban.BuildType.HOUSE, at.getX(), at.getY(), at.getZ()));
+        setAll(h, Role.BUILDER);
+        net.minecraft.world.phys.Vec3 nearSite = h.absolutePos(new BlockPos(12, 1, 17)).getCenter();
+        v.setPos(nearSite);
+        int cost = rrp.neoforge.urban.BuildType.HOUSE.wood();
+        h.assertTrue(inStock(site, level, Resource.WOOD) == 64, "the barrel holds 64 logs");
+        int trips = 0;
+        for (int i = 0; i < 60 && (trips == 0 || site.construction() != null || !site.orders().isEmpty()); i++) {
+            int before = inStock(site, level, Resource.WOOD);
+            int carriedBefore = carried(v, Resource.WOOD);
+            RrpMod.behaviors().runOnce(site, level, v);
+            if (!logi.busy(v)) {
+                h.assertTrue(inStock(site, level, Resource.WOOD) == before, "the stock only moves through trips");
+                toSite(v, site);
+                continue;
+            }
+            // short of logs: it sets off for the barrel, 20+ blocks away, and the stock has not moved yet
+            h.assertTrue(logi.trip(v).kind() == rrp.neoforge.logistics.LogisticsDriver.Kind.WITHDRAW, "a withdraw trip");
+            h.assertTrue(inStock(site, level, Resource.WOOD) == before, "nothing taken while it is still walking");
+            h.assertTrue(site.construction() != null && site.construction().origin().distSqr(barrel) > 20 * 20,
+                    "the site is more than 20 blocks from the barrel");
+            trips++;
+            settleTrip(v, barrel);
+            int loaded = carried(v, Resource.WOOD) - carriedBefore;
+            h.assertTrue(loaded > 0 && loaded <= RrpMod.logistics().access().capacity(), "it loaded some logs: " + loaded);
+            h.assertTrue(before - inStock(site, level, Resource.WOOD) == loaded, "the stock lost exactly the load");
+            // back at the barrel it is far from the site: the next action only walks
+            int step = site.construction().step();
+            RrpMod.behaviors().runOnce(site, level, v);
+            h.assertTrue(site.construction().step() == step, "walking back, nothing built on the way");
+            toSite(v, site);
+        }
+        h.assertTrue(trips >= 1, "at least one round trip");
+        h.assertTrue(site.construction() == null && site.orders().isEmpty(), "the house is finished (trips " + trips + ")");
+        h.assertTrue(64 - inStock(site, level, Resource.WOOD) - carried(v, Resource.WOOD) == cost,
+                "the total cost reached the site only through the trips: " + (64 - inStock(site, level, Resource.WOOD)));
+        h.assertTrue(site.built().getOrDefault(rrp.neoforge.urban.BuildType.HOUSE, 0) == 1, "built counter");
+        h.succeed();
     }
 
     // ---------- gatherers carry on foot (M70) ----------
