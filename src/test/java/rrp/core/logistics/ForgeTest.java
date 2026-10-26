@@ -46,8 +46,9 @@ class ForgeTest {
     }
 
     @Test
-    void nextPicksTheBodyArmourBeforeTheWeaponAndTheRest() {
-        assertEquals(Piece.CHESTPLATE, Forge.next(of(Piece.BOOTS, 1, Piece.SWORD, 1, Piece.CHESTPLATE, 1)).orElseThrow());
+    void nextPicksTheWeaponBeforeTheArmourAndTheRest() {
+        assertEquals(Piece.SWORD, Forge.next(of(Piece.BOOTS, 1, Piece.SWORD, 1, Piece.CHESTPLATE, 1)).orElseThrow());
+        assertEquals(Piece.CHESTPLATE, Forge.next(of(Piece.BOOTS, 1, Piece.CHESTPLATE, 1)).orElseThrow());
         assertEquals(Piece.SWORD, Forge.next(of(Piece.BOOTS, 1, Piece.SWORD, 1)).orElseThrow());
         assertEquals(Piece.BOOTS, Forge.next(of(Piece.BOOTS, 2)).orElseThrow());
     }

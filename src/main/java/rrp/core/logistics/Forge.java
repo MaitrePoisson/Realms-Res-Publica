@@ -10,11 +10,11 @@ import java.util.Optional;
  */
 public final class Forge {
 
-    /** A piece of a guard's kit, in forging priority order (the body armour first, then the weapon). */
+    /** A piece of a guard's kit, in forging priority order (the weapon first, so no guard stays unarmed, then the armour). */
     public enum Piece {
-        CHESTPLATE,
         SWORD,
         BOW,
+        CHESTPLATE,
         HELMET,
         LEGGINGS,
         BOOTS

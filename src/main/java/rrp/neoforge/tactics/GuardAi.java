@@ -213,9 +213,18 @@ public final class GuardAi {
         return logistics != null && logistics.busy(v);
     }
 
-    /** Armed (or living in a village with no armoury, which keeps the old unarmed behaviour). */
+    /** Armed (or living in a village with no armoury, which keeps the old unarmed behaviour), or defending itself. */
     private static boolean armed(VillageSite site, Villager v) {
-        return Armoury.hasWeapon(v) || !site.hasArmoury();
+        return Armoury.hasWeapon(v) || !site.hasArmoury() || threatNear(v);
+    }
+
+    /** Distance (blocks) within which a hostile makes an unarmed guard defend itself instead of waiting for a weapon. */
+    private static final double SELF_DEFENCE = 8;
+
+    /** True when a hostile monster is within {@link #SELF_DEFENCE} blocks of the villager. */
+    public static boolean threatNear(Villager v) {
+        return !v.level().getEntitiesOfClass(Mob.class, v.getBoundingBox().inflate(SELF_DEFENCE),
+                e -> e instanceof Enemy && e.isAlive()).isEmpty();
     }
 
     private static int arrowsOf(Villager v) {

@@ -56,17 +56,6 @@ public abstract class RoleBehavior {
         return found;
     }
 
-    /** Dépose un objet compté dans l'entrepôt ; le reste (tonneau plein) tombe au sol à {@code spill}. */
-    protected static void store(BehaviorContext ctx, ItemStack stack, BlockPos spill) {
-        if (stack == null || stack.isEmpty() || WarehouseService.classify(stack) == null) {
-            return;
-        }
-        ItemStack left = ctx.warehouse().deposit(ctx.site(), ctx.level(), stack);
-        if (left != null && !left.isEmpty()) {
-            Block.popResource(ctx.level(), spill, left);
-        }
-    }
-
     /** True while the villager can still carry something (its load is below {@code carry_capacity}). */
     protected static boolean hasRoom(BehaviorContext ctx) {
         return CarriedItems.free(ctx.villager(), ctx.logistics().access().capacity()) > 0;

@@ -54,6 +54,9 @@ public final class Guard extends RoleBehavior {
         if (armoury == null) {
             return null; // no armoury (yet): the guard keeps the old behaviour
         }
+        if (rrp.neoforge.tactics.GuardAi.threatNear(v)) {
+            return null; // a monster is close: no walk to the armoury now, the guard defends itself with what it has
+        }
         var logistics = ctx.logistics();
         if (!Armoury.complete(v) && logistics.requestEquip(v, site, level) != null) {
             return true; // walking to the armoury

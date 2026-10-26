@@ -63,6 +63,9 @@ public final class ChestAccess {
         if (want <= 0 || warehouse.barrel(site, level) == null) {
             return new Result(0, false);
         }
+        if (requestTrip && animatedTrip(v, site, level, r, amount, false)) {
+            return new Result(0, true);
+        }
         int moved = 0;
         for (Container c : warehouse.containersInReach(site, level, v.position(), reach())) {
             moved += takeFrom(c, v, r, want - moved);
@@ -87,6 +90,9 @@ public final class ChestAccess {
         if (carried <= 0 || warehouse.barrel(site, level) == null) {
             return new Result(0, false);
         }
+        if (requestTrip && animatedTrip(v, site, level, r, 0, true)) {
+            return new Result(0, true);
+        }
         int moved = 0;
         for (Container c : warehouse.containersInReach(site, level, v.position(), reach())) {
             moved += CarriedItems.depositInto(v, r, c);
@@ -100,6 +106,19 @@ public final class ChestAccess {
             return new Result(moved, false);
         }
         return new Result(0, requestTrip && driver != null && driver.requestDeposit(v, site, level, r) != null);
+    }
+
+    /**
+     * A villager already standing within reach still goes through the visible sequence (lid, sound, rummage): the
+     * transfer is handed to a trip that starts in its rummage phase. {@code false} when no trip could start (then the
+     * instant in-reach transfer applies) or when the caller is the driver itself (no trip requested).
+     */
+    private boolean animatedTrip(Villager v, VillageSite site, ServerLevel level, Resource r, int amount, boolean deposit) {
+        if (driver == null || driver.busy(v)
+                || warehouse.containersInReach(site, level, v.position(), reach()).isEmpty()) {
+            return false;
+        }
+        return (deposit ? driver.requestDeposit(v, site, level, r) : driver.requestWithdraw(v, site, level, r, amount)) != null;
     }
 
     /** The nearest container of the stock that holds {@code r}, or {@code null}. */

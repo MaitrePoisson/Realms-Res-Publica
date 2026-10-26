@@ -1701,14 +1701,18 @@ public final class RrpGameTests {
         h.assertTrue(!access.deposit(v, site, level, null, true).tripRequested(), "nothing carried: no deposit trip");
         // near: items are taken, the hand shows them
         stand(v, barrel, true);
-        var near = access.withdraw(v, site, level, Resource.WOOD, 10, true);
+        var anim = access.withdraw(v, site, level, Resource.WOOD, 10, true);
+        h.assertTrue(anim.moved() == 0 && anim.tripRequested() && logi.busy(v) && chest.getItem(0).getCount() == 20,
+                "near villager still does the visible rummage: a trip is started, nothing moves yet: " + anim);
+        logi.cancel(v);
+        var near = access.withdraw(v, site, level, Resource.WOOD, 10, false);
         h.assertTrue(near.moved() == 10 && !near.tripRequested(), "near villager takes 10: " + near);
         h.assertTrue(chest.getItem(0).getCount() == 10 && carried(v, Resource.WOOD) == 10, "10 moved from the barrel to the villager");
         h.assertTrue(v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).is(Items.OAK_LOG), "main hand shows the load");
         h.assertTrue(site.state().stock(Resource.WOOD) == 10, "village stock follows the barrel");
         // capacity: carry_capacity bounds the load
         int cap = access.capacity();
-        var more = access.withdraw(v, site, level, Resource.WOOD, 1000, true);
+        var more = access.withdraw(v, site, level, Resource.WOOD, 1000, false);
         h.assertTrue(more.moved() == 10 && carriedTotal(v) <= cap, "empty barrel gives the 10 left, took " + more.moved());
         chest.setItem(0, new ItemStack(Items.OAK_LOG, 64));
         h.assertTrue(access.withdraw(v, site, level, Resource.WOOD, 1000, false).moved() == cap - 20, "fills up to the capacity");
@@ -1726,7 +1730,7 @@ public final class RrpGameTests {
         logi.cancel(v);
         stand(v, barrel, true);
         chest.setItem(0, ItemStack.EMPTY);
-        var dep = access.deposit(v, site, level, null, true);
+        var dep = access.deposit(v, site, level, null, false);
         h.assertTrue(dep.moved() == cap && carried(v, Resource.WOOD) == 0, "near deposit empties the load: " + dep);
         h.assertTrue(RrpMod.warehouse().read(site, level).getOrDefault(Resource.WOOD, 0) == cap, "stock holds the deposit");
         h.assertTrue(v.getItemBySlot(net.minecraft.world.entity.EquipmentSlot.MAINHAND).isEmpty(), "hand empty after the deposit");
@@ -2129,6 +2133,7 @@ public final class RrpGameTests {
         // rations from the warehouse once equipped
         stand(guard, barrel, true);
         RrpMod.behaviors().runOnce(site, level, guard);
+        finishTrip(guard);
         h.assertTrue(carried(guard, Resource.FOOD) == (int) RrpMod.simConfig().get(rrp.core.SimConfig.Key.GUARD_RATIONS), "rations taken");
         h.succeed();
     }
@@ -2155,12 +2160,13 @@ public final class RrpGameTests {
         h.assertTrue(rrp.neoforge.logistics.Armoury.notices() == before + 1, "the village was told the armoury is empty");
         RrpMod.behaviors().runOnce(site, level, guard);
         h.assertTrue(rrp.neoforge.logistics.Armoury.notices() == before + 1, "the notice is rate-limited");
-        // a hostile next to it is left alone while it has no weapon
+        // a hostile next to it: no patrol and no walk to the armoury, but the guard defends itself
         Creeper creeper = h.spawn(EntityType.CREEPER, new BlockPos(13, 1, 8));
         creeper.setNoAi(true);
         guard.setPos(creeper.position().add(1, 0, 0));
         RrpMod.behaviors().runOnce(site, level, guard);
-        h.assertTrue(creeper.isAlive(), "no strike without a weapon");
+        h.assertTrue(!RrpMod.logistics().busy(guard), "no armoury trip with a monster at its feet");
+        h.assertTrue(!creeper.isAlive() || creeper.getHealth() < creeper.getMaxHealth(), "an unarmed guard still defends itself");
         creeper.discard();
         h.succeed();
     }

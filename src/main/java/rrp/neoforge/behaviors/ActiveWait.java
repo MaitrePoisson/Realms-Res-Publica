@@ -6,6 +6,7 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.level.block.state.BlockState;
 import rrp.core.Resource;
 import rrp.core.Role;
+import rrp.core.SimConfig;
 import rrp.core.logistics.WaitPolicy;
 import rrp.core.logistics.WaitPolicy.Choice;
 import rrp.neoforge.RrpMod;
@@ -32,6 +33,7 @@ public final class ActiveWait {
     private static final class Wait {
         boolean complained;
         boolean sitting;
+        long lastScan = Long.MIN_VALUE;
     }
 
     private static final Map<Villager, Wait> WAITS = new WeakHashMap<>();
@@ -69,6 +71,12 @@ public final class ActiveWait {
     public static Choice hold(BehaviorContext ctx, Resource r) {
         Villager v = ctx.villager();
         Wait w = WAITS.computeIfAbsent(v, k -> new Wait());
+        long now = ctx.level().getGameTime();
+        long retryTicks = (long) (ctx.config().get(SimConfig.Key.WAIT_RETRY_S) * 20);
+        if (w.sitting && !WaitPolicy.shouldRetry(now - w.lastScan, retryTicks)) {
+            return Choice.SIT; // seated: look around again (and re-read the chest) only every wait_retry_s
+        }
+        w.lastScan = now;
         boolean steward = ctx.site().state().villagers().stream().anyMatch(s -> s.role() == Role.STEWARD);
         BlockPos plant = nearestPlant(ctx);
         Choice choice = WaitPolicy.choose(w.complained, steward, plant != null);
