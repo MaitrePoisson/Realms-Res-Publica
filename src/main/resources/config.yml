@@ -385,3 +385,13 @@ guard_heal_amount: 6
 guard_heal_items: "minecraft:golden_apple, minecraft:honey_bottle, minecraft:paper"
 # Biome classification overrides for modded biomes: comma-separated "biome_id=kind" (kind: plains, forest, taiga, jungle, swamp, mountain, badlands, desert, savanna, ocean, river, beach). Empty = automatic (tags, name keywords, climate).
 biome_overrides: ""
+# Visible construction: ticks between two blocks laid by a builder (8 = 0.4 s per block; 0 = legacy, the whole job at once). [0 ; 200]
+build_block_ticks: 8
+# Visible construction: distance (blocks) within which a builder lays a block; it walks along the plan to stay in reach. [2 ; 8]
+build_reach: 4.5
+# Visible crafting: ticks a builder spends on each craft (log to planks, planks to sticks, fences...) at the crafting table. [4 ; 200]
+craft_step_ticks: 20
+# End of a job: units of each material a builder may keep instead of putting the surplus down in a chest. [0 ; 64]
+surplus_keep: 0
+# Visible construction: 1 = a few particles on each block laid, 0 = none. [0 ; 1]
+build_particles: 1

@@ -204,7 +204,13 @@ public final class SimConfig {
         GUARD_CREEPER_CLOSE(6, 2, 12),
         GUARD_CREEPER_REDUCTION(60, 0, 100),
         GUARD_HEAL_AMOUNT(6, 1, 20),
-        CIVILIAN_RELEASE_TICKS(100, 20, 2400);
+        CIVILIAN_RELEASE_TICKS(100, 20, 2400),
+        // Visible construction
+        BUILD_BLOCK_TICKS(8, 0, 200),
+        BUILD_REACH(4.5, 2, 8),
+        CRAFT_STEP_TICKS(20, 4, 200),
+        SURPLUS_KEEP(0, 0, 64),
+        BUILD_PARTICLES(1, 0, 1);
 
         private final double def;
         private final double min;
